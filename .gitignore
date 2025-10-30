@@ -18,4 +18,5 @@ compile_commands.json
 
 __pycache__
 
-gen.out
+include/HateEngineAPI.h
+src/api_sym_lookup_table.h
