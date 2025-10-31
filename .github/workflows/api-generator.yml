@@ -27,7 +27,7 @@ jobs:
 
       # 4. Устанавливаем uv
       - name: 🔧 Setup uv
-        uses: astral-sh/setup-uv@v1
+        uses: astral-sh/setup-uv@v7
 
       # 5. Запускаем генератор
       - name: 🐍 Run API Generator
