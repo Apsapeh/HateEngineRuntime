@@ -42,14 +42,16 @@ jobs:
       # 7. Коммитим и пушим API файл
       - name: 📝 Commit and Push generated API file
         run: |
+          # ❗️ ИСПРАВЛЕНИЕ: Добавляем оба файла
           git add --force include/HateEngineAPI.h src/api_sym_lookup_table.h
           
           if ! git diff --staged --quiet; then
             echo "✅ API file changed. Committing..."
-            # 8. ❗️ Добавляем [ci skip] в сообщение, чтобы этот пуш
-            # не запустил этот же воркфлоу заново.
             git commit -m "chore(api): Generate API header [ci skip]"
-            git push origin master
+            
+            # ❗️ ИСПРАВЛЕНИЕ: Используем HEAD:refs/heads/master для пуша из detached HEAD
+            echo "⬆️ Pushing to master..."
+            git push origin HEAD:refs/heads/master
           else
             echo "🤷 No changes to API file. Skipping commit."
           fi
