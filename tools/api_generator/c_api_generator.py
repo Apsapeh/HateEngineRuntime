@@ -1,6 +1,7 @@
 from api_generator.parser_types import *
 from . import general
 from glob import glob
+import os
 
 API_HEADER = """
 #pragma once
@@ -114,13 +115,20 @@ def run(data: ParseResult):
     for typedef in data.typedefs:
         if typedef.doc != "":
             types += f"{typedef.doc}\n"
-        types += f"typedef {general.get_correct_variable(typedef.type, typedef.name)};\n\n"
+        types += (
+            f"typedef {general.get_correct_variable(typedef.type, typedef.name)};\n\n"
+        )
         pass
 
     for typedef_function in data.typedef_functions:
         if typedef_function.doc != "":
             types += f"{typedef_function.doc}\n"
-        args = ", ".join([general.get_correct_variable(arg._type, arg.name) for arg in typedef_function.args])
+        args = ", ".join(
+            [
+                general.get_correct_variable(arg._type, arg.name)
+                for arg in typedef_function.args
+            ]
+        )
         if args == "":
             args = "void"
         types += f"typedef {typedef_function.return_type} (*{typedef_function.name})({args});\n\n"
@@ -138,7 +146,6 @@ def run(data: ParseResult):
             types += f"#define {name} {value.value}\n\n"
             pass
 
-
     fn_ptrs_decl = ""
     fn_ptrs_impl = ""
     fn_ptrs_load = ""
@@ -153,7 +160,9 @@ def run(data: ParseResult):
             fn_ptrs_decl += f"{function.doc}\n"
             norm_fn_ptrs_decl += f"{function.doc}\n"
 
-        args = ", ".join([general.get_correct_variable(arg._type, arg.name) for arg in function.args])
+        args = ", ".join(
+            [general.get_correct_variable(arg._type, arg.name) for arg in function.args]
+        )
         if args == "":
             args = "void"
 
@@ -163,25 +172,30 @@ def run(data: ParseResult):
         cast_args = ", ".join([f"{arg._type}" for arg in function.args])
         if cast_args == "":
             cast_args = "void"
-        fn_ptrs_load += f"        {function_name} = ({function.return_type} (*)({cast_args}))proc_addr(\"{function.name}\");\n"
+        fn_ptrs_load += f'        {function_name} = ({function.return_type} (*)({cast_args}))proc_addr("{function.name}");\n'
 
-        norm_fn_ptrs_decl += f"extern {function.return_type} (*{function.name})({args});\n\n"
+        norm_fn_ptrs_decl += (
+            f"extern {function.return_type} (*{function.name})({args});\n\n"
+        )
         norm_fn_ptrs_impl += f"    {function.return_type} (*{function.name})({args});\n"
         norm_fn_ptrs_load += f"            {function.name} = {function_name};\n"
 
         if function.name == "__he_update_full_trace_info":
             continue
 
-        trace_impl += full_trace_impl_generator(function.return_type, function.name, function.args)
-        trace_decl += full_trace_header_generator(function.return_type, function.name, function.args)
+        trace_impl += full_trace_impl_generator(
+            function.return_type, function.name, function.args
+        )
+        trace_decl += full_trace_header_generator(
+            function.return_type, function.name, function.args
+        )
         trace_defines += full_trace_define_generator(function.name, function.args)
-
-        
-
 
     servers_init = ""
     for server in data.servers:
-        servers_init += f"    PUBLIC void {server.init_method}({server.name}* backend) {{\n"
+        servers_init += (
+            f"    PUBLIC void {server.init_method}({server.name}* backend) {{\n"
+        )
 
         norm_methods_init = ""
 
@@ -190,7 +204,12 @@ def run(data: ParseResult):
                 fn_ptrs_decl += f"{method.doc}\n"
                 norm_fn_ptrs_decl += f"{method.doc}\n"
 
-            args = ", ".join([general.get_correct_variable(arg._type, arg.name) for arg in method.args])
+            args = ", ".join(
+                [
+                    general.get_correct_variable(arg._type, arg.name)
+                    for arg in method.args
+                ]
+            )
             if args == "":
                 args = "void"
 
@@ -199,31 +218,37 @@ def run(data: ParseResult):
             fn_ptrs_impl += f"    {method.return_type} (*{method_name})({args});\n"
 
             norm_method_name = server.fn_prefix + method.name
-            norm_fn_ptrs_decl += f"extern {method.return_type} (*{norm_method_name})({args});\n\n"
-            norm_fn_ptrs_impl += f"    {method.return_type} (*{norm_method_name})({args});\n"
+            norm_fn_ptrs_decl += (
+                f"extern {method.return_type} (*{norm_method_name})({args});\n\n"
+            )
+            norm_fn_ptrs_impl += (
+                f"    {method.return_type} (*{norm_method_name})({args});\n"
+            )
 
             cast_args = ", ".join([f"{arg._type}" for arg in method.args])
             if cast_args == "":
                 cast_args = "void"
-        
-            servers_init += f"        {method_name} = ({method.return_type} (*)({cast_args}))raw_{server.fn_prefix}backend_get_function(backend, \"{method.name}\");\n"
+
+            servers_init += f'        {method_name} = ({method.return_type} (*)({cast_args}))raw_{server.fn_prefix}backend_get_function(backend, "{method.name}");\n'
             norm_methods_init += f"            {norm_method_name} = {method_name};\n"
 
-
-            trace_impl += full_trace_impl_generator(method.return_type, norm_method_name, method.args)
-            trace_decl += full_trace_header_generator(method.return_type, norm_method_name, method.args)
+            trace_impl += full_trace_impl_generator(
+                method.return_type, norm_method_name, method.args
+            )
+            trace_decl += full_trace_header_generator(
+                method.return_type, norm_method_name, method.args
+            )
             trace_defines += full_trace_define_generator(norm_method_name, method.args)
 
         servers_init += f"        #if !defined(HEAPI_FULL_TRACE)\n"
         servers_init += norm_methods_init
         servers_init += f"        #endif\n"
-        
+
         servers_init += f"    }}\n\n"
-            
 
     include_macros = ""
-    for filename in glob('src/**/*.h', recursive=True):
-        #f = filename[len('src')+1:]
+    for filename in glob("src/**/*.h", recursive=True):
+        # f = filename[len('src')+1:]
         include_macros += include_file_macros(filename) + "\n"
 
     to_replace = (
@@ -247,14 +272,17 @@ def run(data: ParseResult):
     for old, new in to_replace:
         api_header = api_header.replace(old, new, 1)
 
+    # Create include if they are not exist
+    os.makedirs("include", exist_ok=True)
     with open("include/HateEngineAPI.h", "w") as f:
         f.write(api_header)
 
 
-
 def full_trace_header_generator(return_type, name, args) -> str:
     functions = ""
-    functions += f"{return_type} full_trace_{name}(const char* ___file___, uint32_t ___line___"
+    functions += (
+        f"{return_type} full_trace_{name}(const char* ___file___, uint32_t ___line___"
+    )
     if len(args) > 0:
         functions += ", "
     functions += ", ".join([f"{arg._type}" for arg in args])
@@ -262,34 +290,38 @@ def full_trace_header_generator(return_type, name, args) -> str:
 
     return functions
 
+
 def full_trace_impl_generator(return_type, name, args) -> str:
     functions = ""
     functions += f"inline {return_type} full_trace_{name}(const char* ___file___, uint32_t ___line___"
     if len(args) > 0:
         functions += ", "
-    
+
     for arg in args:
         functions += general.get_correct_variable(arg._type, arg.name)
-                    
+
         if arg != args[-1]:
             functions += ", "
     functions += ") {\n"
-    functions += f"    raw___he_update_full_trace_info(\"{name}\", ___file___, ___line___);\n";
-
-
+    functions += (
+        f'    raw___he_update_full_trace_info("{name}", ___file___, ___line___);\n'
+    )
     func_call = f"raw_{name}({', '.join([f'{arg.name}' for arg in args])});"
     if return_type == "void":
         functions += f"    {func_call}\n"
     else:
-        functions += f"    {general.get_correct_variable(return_type, 'result')} = {func_call}\n"
+        functions += (
+            f"    {general.get_correct_variable(return_type, 'result')} = {func_call}\n"
+        )
 
-    functions += "    raw___he_update_full_trace_info(\"\", \"\", -1);\n"
+    functions += '    raw___he_update_full_trace_info("", "", -1);\n'
 
     if return_type != "void":
         functions += f"    return result;\n"
     functions += "}\n\n"
 
     return functions
+
 
 def full_trace_define_generator(name, args):
     result = ""
@@ -315,7 +347,8 @@ def include_file(file) -> str:
                 result.append(c)
 
         return "\n".join(result)
-    
+
+
 def include_file_macros(file) -> str:
     with open(file, "r") as f:
         code = f.read().splitlines()
@@ -323,7 +356,9 @@ def include_file_macros(file) -> str:
         result: list[str] = []
         is_in_api: bool = False
         for i, c in enumerate(code):
-            if c.startswith("// MACROS API START") or c.startswith("// MACROS API BEGIN"):
+            if c.startswith("// MACROS API START") or c.startswith(
+                "// MACROS API BEGIN"
+            ):
                 is_in_api = True
             elif c.startswith("// MACROS API END"):
                 is_in_api = False
@@ -331,29 +366,31 @@ def include_file_macros(file) -> str:
                 result.append(c)
 
         return "\n".join(result)
-    
+
+
 def camel_to_upper_snake_case(name):
     result = []
     n = len(name)
-    
+
     for i in range(n):
         current_char = name[i]
-        prev_char = name[i-1] if i > 0 else ''
-        next_char = name[i+1] if i < n-1 else ''
-        
+        prev_char = name[i - 1] if i > 0 else ""
+        next_char = name[i + 1] if i < n - 1 else ""
+
         should_add_underscore = False
-        
+
         if current_char.isupper():
             if prev_char.islower():
                 should_add_underscore = True
-            elif prev_char == '_':
+            elif prev_char == "_":
                 should_add_underscore = True
             elif i > 0 and next_char.islower():
                 should_add_underscore = True
-        
+
         if should_add_underscore:
-            result.append('_')
-        
+            result.append("_")
+
         result.append(current_char)
-    
-    return ''.join(result).upper()
+
+    return "".join(result).upper()
+
