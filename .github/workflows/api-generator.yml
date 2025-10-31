@@ -1,0 +1,55 @@
+name: 🛠️ Generate API on Master
+
+on:
+  # 1. Запускается при каждом пуше в 'master'
+  # (Обычно это происходит после мержа PR)
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  generate-api:
+    # 2. ❗️ Важно: предотвращаем бесконечный цикл.
+    # Не запускаем, если последний коммит - это коммит от самого бота.
+    if: "!contains(github.event.head_commit.message, '[ci skip]')"
+    
+    runs-on: ubuntu-latest
+    steps:
+      # 3. Забираем код из 'master'
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Нам нужен коммит, который только что запушили
+          ref: ${{ github.sha }}
+
+      # 4. Устанавливаем uv
+      - name: 🔧 Setup uv
+        uses: astral-sh/setup-uv@v1
+
+      # 5. Запускаем генератор
+      - name: 🐍 Run API Generator
+        run: ./tools/api-generator.py
+
+      # 6. Настраиваем Git
+      - name: 🤖 Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+      # 7. Коммитим и пушим API файл
+      - name: 📝 Commit and Push generated API file
+        run: |
+          git add --force include/HateEngineAPI.h src/api_sym_lookup_table.h
+          
+          if ! git diff --staged --quiet; then
+            echo "✅ API file changed. Committing..."
+            # 8. ❗️ Добавляем [ci skip] в сообщение, чтобы этот пуш
+            # не запустил этот же воркфлоу заново.
+            git commit -m "chore(api): Generate API header [ci skip]"
+            git push origin master
+          else
+            echo "🤷 No changes to API file. Skipping commit."
+          fi
