@@ -1,6 +1,6 @@
 #pragma once
 
-#include "error.h"
+#include "../error.h"
 #include "types.h"
 
 
@@ -10,7 +10,7 @@
 typedef struct {
     u8* ptr;
     usize len;
-} string;
+} String;
 
 /**
  * @api
@@ -27,215 +27,250 @@ typedef struct {
 typedef struct {
     u8* s;
     usize len;
-} string_slice;
+} StringSlice;
 
 /**
  * @api
+ * @brief create empty String with null-terminator
  */
-Error string_new(string** str);
+String* string_new(void);
 
 /**
  * @api
+ * @brief create String by char*
  */
-string* string_from(const char* c_str);
+String* string_from(const char* c_str);
 
 /**
  * @api
+ * @brief clone String by existing String
  */
-string* string_clone(const string* c_str);
+String* string_clone(const String* c_str);
 
 /**
  * @api
+ * @brief update String by char* knowing its len
+ * @param c_str pointer on new content of String
+ * @param len_c_str len of c_str
  */
-string* string_set_cstr(string* self, const char* c_cstr);
+String* string_set_cstr_len(String* self, const char* c_str, const usize len_c_str);
 
 /**
  * @api
+ * @brief update String by char*
+ * @param c_str pointer on new content of String
  */
-string* string_set(string* self, const string* c_str);
+String* string_set_cstr(String* self, const char* c_str);
 
 /**
  * @api
+ * @brief update String by existing String
+ * @param str  copied String
  */
-// test
-char* string_cstr(const string* c_str);
+String* string_set(String* self, const String* str);
 
 /**
  * @api
+ * @brief get String by way char*
  */
-// test
-usize string_len(const string* c_str);
+char* string_cstr(const String* self);
 
 /**
  * @api
+ * @brief get len of the passed String
  */
-// test
-usize string_size(const string* c_str);
+usize string_len(const String* c_str);
 
 /**
  * @api
+ * @brief get size of the passed String
  */
-// test
-string* string_push_back(string* dest, const string* src);
+usize string_size(const String* c_str);
 
 /**
  * @api
+ * @brief add src-String in the end of self-String
+ * @param src  String that need to add
  */
-// test
-string* string_push_back_cstr(string* dest, const char* src);
+String* string_push_back(String* self, const String* src);
 
 /**
  * @api
+ * @brief add  char* in the end of self-String
+ * @param src  char* that need to add
  */
-// test
-string* string_push_front(string* dest, const string* src);
+String* string_push_back_cstr(String* self, const char* src);
+
+String* string_push_back_cstr_ex(String* self, const char* src);
 
 /**
  * @api
+ * @brief add  src-String in the front of self-String
+ * @param src  String that need to add
  */
-// test
-string* string_push_front_cstr(string* dest, const char* src);
+String* string_push_front(String* self, const String* src);
 
 /**
  * @api
+ * @brief add  char* in the front of self-String
+ * @param src  char* that need to add
  */
-// test
-string* string_insert(string* dest, const string* src, const usize i);
+String* string_push_front_cstr(String* self, const char* src);
+
+String* string_push_front_cstr_ex(String* self, const char* src);
 
 /**
  * @api
+ * @brief insert src-String in self-String by symbol index
+ * @param src String that need to insert
+ * @param i   symbol index
  */
-// test
-string* string_insert_cstr(string* dest, const char* src, const usize i);
+String* string_insert(String* self, const String* src, const usize i);
 
 /**
  * @api
+ * @brief insert char* in self-String by symbol index
+ * @param src char* that need to insert
+ * @param i   symbol index
  */
-// test
-string* string_insert_cstr_ex(string* dest, const char* src, const usize i);
+String* string_insert_cstr(String* self, const char* src, const usize i);
+
+String* string_insert_cstr_ex(String* self, const char* src, const usize i, const usize len_src);
 
 /**
  * @api
+ * @brief insert char* in self-String by byte index
+ * @param src char* that need to insert
+ * @param b   byte index
  */
-// test
-string* string_insert_cstr_by_byte(string* dest, const char* src, const usize b);
+String* string_insert_cstr_by_byte(String* self, const char* src, const usize b);
 
 /**
  * @api
+ * @brief insert src-String in self-String by byte index
+ * @param src String that need to insert
+ * @param b   byte index
  */
-// test
-string* string_insert_by_byte(string* dest, const string* src, const usize b);
+String* string_insert_by_byte(String* self, const String* src, const usize b);
 
 /**
  * @api
+ * @brief remove symbol under symbol index
+ * @param i symbol index
  */
-// test
-string* string_remove(string* self, const usize i);
+String* string_remove(String* self, const usize i);
 
 /**
  * @api
+ * @brief remove symbol under byte index
+ * @param b byte index
  */
-// test
-string* string_remove_by_byte(string* self, const usize b);
+String* string_remove_by_byte(String* self, const usize b);
 
 /**
  * @api
+ * @brief remove n of symbols since symbol  under symbol index
+ * @param i symbol index
+ * @param n count removed symbols
  */
-// test
-string* string_remove_n(string* self, const usize i, const usize n);
+String* string_remove_n(String* self, const usize i, const usize n);
 
 /**
  * @api
+ * @brief remove n of byte since byte  under byte index
+ * @param b byte index
+ * @param b_n count removed byte
  */
-// test
-string* string_remove_n_by_byte(string* self, const usize b, const usize b_n);
+String* string_remove_n_by_byte(String* self, const usize b, const usize b_n);
 
 /**
  * @api
+ * @brief check on equality Strings
+ * @param str1 fisrt String
+ * @param str2 second String
  */
-// test
-boolean string_equals(const string* str1, const string* str2);
+boolean string_equals(const String* str1, const String* str2);
 
 /**
  * @api
+ * @brief check on equality String and char*
+ * @param str checking String
+ * @param c_str checking char*
  */
-// test
-boolean string_equals_cstr(const string* str, const char* cstr);
+boolean string_equals_cstr(const String* str, const char* c_str);
 
 /**
  * @api
+ * @brief free memory of passed String
  */
-void string_free(string* str);
+void string_free(String* self);
 
 /**
  * @api
+ * @brief get StringSlice from String
+ * @param s start point
+ * @param e end point
  */
-void string_itr_free(string_itr* str_itr);
+StringSlice* string_get_slice(const String* self, const usize s, const usize e);
 
 /**
  * @api
+ * @brief String from StringSlice
  */
-string_itr* string_get_itr(const string* c_str);
+String* string_from_slice(const StringSlice* self);
 
 /**
  * @api
+ * @brief check on equality StringsSlice
+ * @param str_sl_1 fisrt StringSlice
+ * @param str_sl_2 second StringSlice
  */
-u8 string_itr_next(string_itr* str_itr);
+boolean string_equals_slice(StringSlice* str_sl_1, StringSlice* str_sl_2);
 
 /**
  * @api
+ * @brief copy data str_sl in self
+ * @param str_sl StringSLice which from take data
  */
-string_slice* string_get_slice(const string* str, const usize s, const usize e);
+StringSlice* string_set_slice(StringSlice* self, const StringSlice* str_sl);
 
 /**
  * @api
+ * @brief add StringSlice in last of self-String
+ * @param src StringSlice that will be added
  */
-string* string_from_slice(const string_slice* str_sl);
+String* string_push_back_slice(String* self, const StringSlice* src);
 
 /**
  * @api
+ * @brief add StringSlice in front of self-String
+ * @param src StringSlice that will be added
  */
-boolean string_equals_slice(string_slice* str_sl_1, string_slice* str_sl_2);
+String* string_push_front_slice(String* self, const StringSlice* src);
+
+String* string_insert_slice_ex(String* self, const StringSlice* src, const usize i);
 
 /**
  * @api
+ * @brief insert StringSlice in String under symbol index i
+ * @param src StringSlice that will be inserted
+ * @param i   symbol index
  */
-string_slice* string_set_slice(string_slice* self, const string_slice* str_sl);
+String* string_insert_slice(String* self, const StringSlice* src, const usize i);
 
 /**
  * @api
+ * @brief insert StringSlice in String under byte index b\
+ * @param src StringSlice that will be inserted
+ * @param b   byte index
  */
-// test
-string* string_push_back_slice(string* dest, const string_slice* src);
+String* string_insert_slice_by_byte(String* self, const StringSlice* src, const usize b);
 
 /**
  * @api
+ * @brief free memory of passed StringSLice
  */
-// test
-string* string_push_front_slice(string* dest, const string_slice* src);
-
-/**
- * @api
- */
-// test
-string* string_insert_slice_ex(string* dest, const string_slice* src, const usize i);
-
-/**
- * @api
- */
-// test
-string* string_insert_slice(string* dest, const string_slice* src, const usize i);
-
-/**
- * @api
- */
-// test
-string* string_insert_slice_by_byte(string* dest, const string_slice* src, const usize b);
-
-/**
- * @api
- */
-void string_slice_free(string_slice* str_sl);
+void string_slice_free(StringSlice* self);
 
 //<--------------------------- UTF-8 --------------------------->
 
@@ -265,7 +300,7 @@ Error string_utf8_new(string_utf8** str);
 /**
  * @api
  */
-Error string_utf8_to_string(string** dest, const string_utf8* str);
+Error string_utf8_to_string(String** dest, const string_utf8* str);
 
 /**
  * @api
