@@ -31,7 +31,9 @@ jobs:
       - name: Check for changes
         id: check_changes
         run: |
-          git add -f include/HateEngineAPI.h
+          git config user.name "api-generator-bot" 
+          git config user.email "api-generator-bot@users.noreply.github.com"
+          git add -f include/HateEngineAPI.h src/api_sym_lookup_table.h
           if git diff --staged --quiet; then
             echo "changed=false" >> $GITHUB_OUTPUT
           else
@@ -46,7 +48,7 @@ jobs:
           commit-message: "chore: auto-generate HateEngineAPI.h"
           branch: api-generator/update-api
           delete-branch: true
-          title: "🤖 Auto-generate HateEngineAPI.h"
+          title: "🤖 Auto-generate HateEngineAPI.h and api_sym_lookup_table.h"
           body: |
             Auto-generated API file from the latest changes.
             
