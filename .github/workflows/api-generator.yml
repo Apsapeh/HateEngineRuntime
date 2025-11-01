@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - 'include/HateEngineAPI.h'
+      - 'src/api_sym_lookup_table.h'
 
 jobs:
   generate-api:
@@ -31,8 +34,6 @@ jobs:
       - name: Check for changes
         id: check_changes
         run: |
-          git config user.name "api-generator-bot"
-          git config user.email "api-generator-bot@users.noreply.github.com"
           git add -f include/HateEngineAPI.h src/api_sym_lookup_table.h
           if git diff --staged --quiet; then
             echo "changed=false" >> $GITHUB_OUTPUT
@@ -46,7 +47,9 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GH_PAT }}
-          commit-message: "chore: auto-generate HateEngineAPI.h and api_sym_lookup_table.h"
+          commit-message: "chore: auto-generate HateEngineAPI.h and api_sym_lookup_table.h [ci skip]"
+          committer: api-generator-bot <api-generator-bot@users.noreply.github.com>
+          author: api-generator-bot <api-generator-bot@users.noreply.github.com>
           branch: api-generator/update-api
           delete-branch: true
           title: "🤖 Auto-generate HateEngineAPI.h and api_sym_lookup_table.h"
