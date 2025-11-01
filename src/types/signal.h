@@ -1,6 +1,7 @@
 #pragma once
 
 #include <types/types.h>
+#include <types/vector.h>
 #include <ex_alloc/chunk_allocator.h>
 
 
@@ -16,6 +17,9 @@ typedef struct SignalCallback {
     void* ctx;
 } SignalCallback;
 
+
+vector_template_def(SignalCallback, SignalCallback);
+
 /**
  * @brief It's just a signal
  *
@@ -26,7 +30,8 @@ typedef struct SignalCallback {
  * @api
  */
 typedef struct Signal {
-    ChunkMemoryAllocator allocator;
+    // ChunkMemoryAllocator allocator;
+    vec_SignalCallback data;
 } Signal;
 
 /**
@@ -41,7 +46,7 @@ typedef chunk_allocator_ptr SignalCallbackHandler;
  * @error "InvalidArgument"
  * @error "AllocationFailed"
  */
-boolean signal_constructor(Signal* self, const u32 chunk_min_siz, const u8 minimal_chunks_count);
+boolean signal_constructor(Signal* self);
 
 /**
  * @brief It's like 'signal_free', but for your allocated Signals. Available only in engine scope.
@@ -58,15 +63,6 @@ boolean signal_destructor(Signal* self);
  * @api
  */
 Signal* signal_new(void);
-
-/**
- * @brief Create a Signal instance with custom ChunkMemoryAllocator parameters
- *
- * @error "InvalidArgument"
- * @error "AllocationFailed"
- * @api
- */
-Signal* signal_new_with_params(const u32 chunk_min_size, const u8 minimal_chunks_count);
 
 /**
  * @brief Free Signal instance
@@ -97,6 +93,7 @@ SignalCallbackHandler signal_connect(Signal* self, SignalCallbackFunc func, void
  * @brief Disconnect callback from the signal.
  *
  * @error "InvalidArgument"
+ * @error "NotFound" if handler out of index boundary or callback by this handler is NULL
  * @api
  */
 boolean signal_disconnect(Signal* self, SignalCallbackHandler handler);
