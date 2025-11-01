@@ -5,7 +5,7 @@ on:
   # (Обычно это происходит после мержа PR)
   push:
     branches:
-      - master
+      - develop
 
 permissions:
   contents: write
@@ -40,18 +40,23 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
       # 7. Коммитим и пушим API файл
-      - name: 📝 Commit and Push generated API file
+      # создаём новую ветку, коммитим и пушим в неё
+      - name: Create and push api-update branch
         run: |
-          # ❗️ ИСПРАВЛЕНИЕ: Добавляем оба файла
-          git add --force include/HateEngineAPI.h src/api_sym_lookup_table.h
-          
-          if ! git diff --staged --quiet; then
-            echo "✅ API file changed. Committing..."
-            git commit -m "chore(api): Generate API header [ci skip]"
-            
-            # ❗️ ИСПРАВЛЕНИЕ: Используем HEAD:refs/heads/master для пуша из detached HEAD
-            echo "⬆️ Pushing to master..."
-            git push origin HEAD:refs/heads/master
-          else
-            echo "🤷 No changes to API file. Skipping commit."
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b api-update-${{ github.run_id }}
+          git add .
+          git commit -m "Automated API update from workflow #${{ github.run_id }}" || echo "No changes to commit"
+          git push origin api-update-${{ github.run_id }}
+      
+      # создаём PR из этой ветки в master
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: master
+          branch: api-update-${{ github.run_id }}
+          title: "Automated API update"
+          body: "This PR updates generated API files."
+          draft: false
