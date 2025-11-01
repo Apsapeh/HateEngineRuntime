@@ -19,7 +19,7 @@ jobs:
           fetch-depth: 0
       
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v7
         with:
           version: "latest"
       
@@ -42,7 +42,7 @@ jobs:
         if: steps.check_changes.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_PAT }}
           commit-message: "chore: auto-generate HateEngineAPI.h"
           branch: api-generator/update-api
           delete-branch: true
@@ -59,4 +59,4 @@ jobs:
         if: steps.check_changes.outputs.changed == 'true'
         run: gh pr merge --auto --squash api-generator/update-api
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
