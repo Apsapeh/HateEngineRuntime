@@ -31,7 +31,7 @@ jobs:
       - name: Check for changes
         id: check_changes
         run: |
-          git config user.name "api-generator-bot" 
+          git config user.name "api-generator-bot"
           git config user.email "api-generator-bot@users.noreply.github.com"
           git add -f include/HateEngineAPI.h src/api_sym_lookup_table.h
           if git diff --staged --quiet; then
@@ -42,23 +42,26 @@ jobs:
       
       - name: Create Pull Request
         if: steps.check_changes.outputs.changed == 'true'
+        id: create_pr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GH_PAT }}
-          commit-message: "chore: auto-generate HateEngineAPI.h"
+          commit-message: "chore: auto-generate HateEngineAPI.h and api_sym_lookup_table.h"
           branch: api-generator/update-api
           delete-branch: true
           title: "🤖 Auto-generate HateEngineAPI.h and api_sym_lookup_table.h"
           body: |
-            Auto-generated API file from the latest changes.
+            Auto-generated API files from the latest changes.
             
             This PR was automatically created by the API generator workflow.
           labels: |
             automated
             api-generator
-
+      
       - name: Enable auto-merge
         if: steps.check_changes.outputs.changed == 'true'
-        run: gh pr merge --auto --squash api-generator/update-api
+        run: |
+          PR_NUMBER=$(gh pr list --head api-generator/update-api --json number --jq '.[0].number')
+          gh pr merge --auto --squash "$PR_NUMBER"
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
