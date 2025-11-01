@@ -3,27 +3,28 @@
 #include "ex_alloc/chunk_allocator.h"
 #include "log.h"
 #include "platform/memory.h"
+#include "platform/mutex.h"
 #include "types/types.h"
 #include "types/vector.h"
 
 vector_template_impl(SignalCallback, SignalCallback);
 
-boolean signal_constructor(Signal* self) {
+boolean signal_unsafe_constructor(SignalUnsafe* self) {
     ERROR_ARGS_CHECK_1(self, { return false; });
     self->data = vec_SignalCallback_init();
     return true;
 }
 
-boolean signal_destructor(Signal* self) {
+boolean signal_unsafe_destructor(SignalUnsafe* self) {
     ERROR_ARGS_CHECK_1(self, { return false; });
     vec_SignalCallback_free(&self->data);
     return true;
 }
 
-Signal* signal_new(void) {
-    Signal* self = tmalloc(sizeof(Signal));
+SignalUnsafe* signal_unsafe_new(void) {
+    SignalUnsafe* self = tmalloc(sizeof(SignalUnsafe));
     ERROR_ALLOC_CHECK(self, { return NULL; });
-    boolean s = signal_constructor(self);
+    boolean s = signal_unsafe_constructor(self);
     if (s) {
         return self;
     } else {
@@ -33,8 +34,8 @@ Signal* signal_new(void) {
 }
 
 
-boolean signal_free(Signal* self) {
-    if (signal_destructor(self)) {
+boolean signal_unsafe_free(SignalUnsafe* self) {
+    if (signal_unsafe_destructor(self)) {
         tfree(self);
         return true;
     } else {
@@ -42,7 +43,7 @@ boolean signal_free(Signal* self) {
     }
 }
 
-boolean signal_emit(Signal* self, void* args) {
+boolean signal_unsafe_emit(SignalUnsafe* self, void* args) {
     ERROR_ARG_CHECK(self, { return false; });
 
     const SignalCallback* const data_end_ptr = self->data.data + self->data.size;
@@ -56,9 +57,11 @@ boolean signal_emit(Signal* self, void* args) {
 }
 
 
-// static find_in_vec(const Signal* const self, )
+// static find_in_vec(const SignalUnsafe* const self, )
 
-SignalCallbackHandler signal_connect(Signal* self, SignalCallbackFunc func, void* ctx) {
+SignalCallbackHandler signal_unsafe_connect(
+        SignalUnsafe* const self, SignalCallbackFunc func, void* ctx
+) {
     ERROR_ARGS_CHECK_2(self, func, { return 0; });
 
     // Finding empty cell in the data vector
@@ -83,7 +86,7 @@ SignalCallbackHandler signal_connect(Signal* self, SignalCallbackFunc func, void
     return self->data.size - 1;
 }
 
-boolean signal_disconnect(Signal* self, SignalCallbackHandler handler) {
+boolean signal_unsafe_disconnect(SignalUnsafe* self, SignalCallbackHandler handler) {
     ERROR_ARGS_CHECK_2(self, handler, { return false; });
     if (handler >= self->data.size) {
         LOG_ERROR(
@@ -124,4 +127,77 @@ boolean signal_disconnect(Signal* self, SignalCallbackHandler handler) {
     }
 
     return true;
+}
+
+
+/* ============== Safe functions ================ */
+boolean signal_constructor(Signal* self) {
+    ERROR_ARG_CHECK(self, { return false; });
+    boolean s = signal_unsafe_constructor(&self->unsafe);
+    if (!s) {
+        LOG_ERROR("'signal_constructor': SignalUnsafe construction failed");
+        return false;
+    }
+
+    // Mutex init
+    self->mutex = mutex_new();
+    if (self->mutex == NULL) {
+        LOG_ERROR("'signal_constructor': Mutex initialization failed");
+        set_error(ERROR_MUTEX_INIT_FAILED);
+        return false;
+    }
+
+    return true;
+}
+
+boolean signal_destructor(Signal* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    signal_unsafe_destructor(&self->unsafe);
+    mutex_free(self->mutex);
+    return true;
+}
+
+Signal* signal_new(void) {
+    Signal* self = tmalloc(sizeof(Signal));
+    ERROR_ALLOC_CHECK(self, { return NULL; });
+    boolean s = signal_constructor(self);
+    if (s) {
+        return self;
+    } else {
+        tfree(self);
+        return NULL;
+    }
+}
+
+boolean signal_free(Signal* self) {
+    if (signal_destructor(self)) {
+        tfree(self);
+        return true;
+    } else {
+        return false;
+    }
+}
+
+boolean signal_emit(Signal* self, void* args) {
+    ERROR_ARG_CHECK(self, { return false; });
+    mutex_lock(self->mutex);
+    boolean st = signal_unsafe_emit(&self->unsafe, args);
+    mutex_unlock(self->mutex);
+    return st;
+}
+
+SignalCallbackHandler signal_connect(Signal* const self, SignalCallbackFunc func, void* ctx) {
+    ERROR_ARGS_CHECK_2(self, func, { return 0; });
+    mutex_lock(self->mutex);
+    SignalCallbackHandler handler = signal_unsafe_connect(&self->unsafe, func, ctx);
+    mutex_unlock(self->mutex);
+    return handler;
+}
+
+boolean signal_disconnect(Signal* self, SignalCallbackHandler handler) {
+    ERROR_ARGS_CHECK_2(self, handler, { return false; });
+    mutex_lock(self->mutex);
+    boolean st = signal_unsafe_disconnect(&self->unsafe, handler);
+    mutex_unlock(self->mutex);
+    return st;
 }
