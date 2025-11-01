@@ -13,13 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
       
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -41,30 +40,12 @@ jobs:
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
       
-      - name: Create Pull Request
-        if: steps.check_changes.outputs.changed == 'true'
-        id: create_pr
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GH_PAT }}
-          commit-message: "chore: auto-generate HateEngineAPI.h and api_sym_lookup_table.h [ci skip]"
-          committer: api-generator-bot <api-generator-bot@users.noreply.github.com>
-          author: api-generator-bot <api-generator-bot@users.noreply.github.com>
-          branch: api-generator/update-api
-          delete-branch: true
-          title: "🤖 Auto-generate HateEngineAPI.h and api_sym_lookup_table.h"
-          body: |
-            Auto-generated API files from the latest changes.
-            
-            This PR was automatically created by the API generator workflow.
-          labels: |
-            automated
-            api-generator
-      
-      - name: Enable auto-merge
+      - name: Commit and push changes
         if: steps.check_changes.outputs.changed == 'true'
         run: |
-          PR_NUMBER=$(gh pr list --head api-generator/update-api --json number --jq '.[0].number')
-          gh pr merge --auto --squash "$PR_NUMBER"
+          git config user.name "api-generator-bot"
+          git config user.email "api-generator-bot@users.noreply.github.com"
+          git commit -m "chore: auto-generate HateEngineAPI.h and api_sym_lookup_table.h [ci skip]"
+          git push
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
