@@ -1,4 +1,4 @@
-// Тест
+
 #pragma once
 // clang-format off
 #include <stddef.h>
