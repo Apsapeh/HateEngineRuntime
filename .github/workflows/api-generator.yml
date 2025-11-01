@@ -10,16 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.API_GENERATOR_TOKEN }}
       
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v3
         with:
           version: "latest"
       
@@ -38,10 +38,25 @@ jobs:
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
       
-      - name: Commit and push changes
+      - name: Create Pull Request
         if: steps.check_changes.outputs.changed == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: auto-generate HateEngineAPI.h [skip ci]"
-          git push --force
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: auto-generate HateEngineAPI.h"
+          branch: api-generator/update-api
+          delete-branch: true
+          title: "🤖 Auto-generate HateEngineAPI.h"
+          body: |
+            Auto-generated API file from the latest changes.
+            
+            This PR was automatically created by the API generator workflow.
+          labels: |
+            automated
+            api-generator
+
+      - name: Enable auto-merge
+        if: steps.check_changes.outputs.changed == 'true'
+        run: gh pr merge --auto --squash api-generator/update-api
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
