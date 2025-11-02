@@ -122,7 +122,9 @@ typedef struct {
     boolean (*_quit)(void);
 
     // TODO:  change to StringSlice when fix/string PR is will be allowed
-    Signal* (*get_signal)(c_str name);
+    // Signal* (*get_signal)(c_str name);
+    // SignalCallbackHandler (*signal_connect)(c_str name, SignalCallbackFunc func, void* ctx);
+    // boolean (*signal_disconnect)(c_str name, SignalCallbackHandler);
 
     boolean (*frame_begin)(void);
     boolean (*frame_end)(void);
@@ -225,6 +227,7 @@ boolean render_server_is_loaded(void);
  * @brief Create a new RenderServerBackend instance
  * @return NULL if memory allocation fails
  *
+ * @error "AllocationFailed"
  * @api
  */
 RenderServerBackend* render_server_backend_new(void);

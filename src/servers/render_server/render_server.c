@@ -85,8 +85,8 @@ static boolean backend_set_get(
 );
 
 RenderServerBackend* render_server_backend_new(void) {
-    // FIXME: Add tmalloc check
     RenderServerBackend* backend = tmalloc(sizeof(RenderServerBackend));
+    ERROR_ALLOC_CHECK(backend, { return NULL; });
 
     // TODO: Add default functions
 
