@@ -2,6 +2,11 @@
 
 #include <types/types.h>
 
+// MACROS API START
+#define ERROR_MUTEX_INIT_FAILED "MutexInitFailed"
+// MACROS API END
+
+
 /**
  * @brief Opaque mutex handle
  * @api

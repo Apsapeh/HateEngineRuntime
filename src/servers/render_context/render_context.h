@@ -2,6 +2,7 @@
 
 #include <error.h>
 #include <types/types.h>
+#include <types/signal.h>
 
 #include <servers/window_server/window_server.h>
 
@@ -22,6 +23,12 @@ typedef struct RenderContextSurface RenderContextSurface;
 typedef struct {
     boolean (*_init)(void);
     boolean (*_quit)(void);
+
+    // TODO:  change to StringSlice when fix/string PR is will be allowed
+    SignalCallbackHandler (*signal_connect)(c_str name, SignalCallbackFunc func, void* ctx);
+    boolean (*signal_disconnect)(c_str name, SignalCallbackHandler);
+    i32 (*get_available_signals)(c_str* names_buff, c_str* descriptions_buff);
+
 
     RenderContextSurface* (*create_surface)(WindowServerWindow* window);
     boolean (*destroy_surface)(RenderContextSurface* surface);

@@ -6,11 +6,11 @@
 #include <stdlib.h>
 
 void signal_a_fn1(void* args, void* ctx) {
-    printf("Hello from Function 1, Signal A\n");
+    printf("Hello from Function 1, Unsafe Signal A\n");
 }
 
 void signal_a_fn2(void* args, void* ctx) {
-    printf("Hello from Function 2, Signal A\n");
+    printf("Hello from Function 2, Unasfe Signal A\n");
 }
 
 
@@ -25,20 +25,20 @@ void signal_b_fn(void* args, void* ctx) {
 }
 
 
-Signal* g_signalA;
+SignalUnsafe* g_signalA;
 Signal* g_signalB;
 PUBLIC void _ready(void) {
-    g_signalA = signal_new();
+    g_signalA = signal_unsafe_new();
     g_signalB = signal_new();
 
-    signal_connect(g_signalA, signal_a_fn1, NULL);
-    signal_connect(g_signalA, signal_a_fn2, NULL);
+    signal_unsafe_connect(g_signalA, signal_a_fn1, NULL);
+    signal_unsafe_connect(g_signalA, signal_a_fn2, NULL);
 
     int* ctx = tmalloc(sizeof(int));
     *ctx = 0;
     signal_connect(g_signalB, signal_b_fn, ctx);
 
-    signal_emit(g_signalA, NULL);
+    signal_unsafe_emit(g_signalA, NULL);
 }
 
 PUBLIC void _process(double delta) {
