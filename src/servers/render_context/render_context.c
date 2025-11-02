@@ -130,6 +130,7 @@ fptr render_context_backend_get_function(RenderContextBackend* backend, const ch
 static boolean backend_set_get(
         RenderContextBackend* backend, const char* name, void (**fn)(void), unsigned char is_set
 ) {
+<<<<<<< HEAD
     typedef void (**FnT)(void);
     struct FnPair {
         const char* name;
@@ -152,6 +153,9 @@ static boolean backend_set_get(
             FN_PAIR(surface_present),
             FN_PAIR(get_proc_addr)
     };
+=======
+#include "setget-pairs-table.h.gen"
+>>>>>>> origin/master
 
     for (usize i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
         if (!strcmp(name, pairs[i].name)) {
