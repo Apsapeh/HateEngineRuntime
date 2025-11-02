@@ -130,32 +130,7 @@ fptr render_context_backend_get_function(RenderContextBackend* backend, const ch
 static boolean backend_set_get(
         RenderContextBackend* backend, const char* name, void (**fn)(void), unsigned char is_set
 ) {
-<<<<<<< HEAD
-    typedef void (**FnT)(void);
-    struct FnPair {
-        const char* name;
-        FnT function;
-    };
-
-    // TODO: generate with API Generator
-    // clang-format off
-    #define FN_PAIR(fn) {#fn, (FnT)&backend-> fn}
-    // clang-format on
-    const struct FnPair pairs[] = {
-            FN_PAIR(_init),
-            FN_PAIR(_quit),
-            FN_PAIR(signal_connect),
-            FN_PAIR(signal_disconnect),
-            FN_PAIR(get_available_signals),
-            FN_PAIR(create_surface),
-            FN_PAIR(destroy_surface),
-            FN_PAIR(surface_make_current),
-            FN_PAIR(surface_present),
-            FN_PAIR(get_proc_addr)
-    };
-=======
 #include "setget-pairs-table.h.gen"
->>>>>>> origin/master
 
     for (usize i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
         if (!strcmp(name, pairs[i].name)) {
