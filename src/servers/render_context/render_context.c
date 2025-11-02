@@ -136,21 +136,21 @@ static boolean backend_set_get(
         FnT function;
     };
 
-// TODO: generate with API Generator
-// clang-format off
+    // TODO: generate with API Generator
+    // clang-format off
     #define FN_PAIR(fn) {#fn, (FnT)&backend-> fn}
     // clang-format on
     const struct FnPair pairs[] = {
-            {"_init", (FnT) &backend->_init},
-            {"_quit", (FnT) &backend->_quit},
+            FN_PAIR(_init),
+            FN_PAIR(_quit),
             FN_PAIR(signal_connect),
             FN_PAIR(signal_disconnect),
             FN_PAIR(get_available_signals),
-            {"create_surface", (FnT) &backend->create_surface},
-            {"destroy_surface", (FnT) &backend->destroy_surface},
-            {"surface_make_current", (FnT) &backend->surface_make_current},
-            {"surface_present", (FnT) &backend->surface_present},
-            {"get_proc_addr", (FnT) &backend->get_proc_addr},
+            FN_PAIR(create_surface),
+            FN_PAIR(destroy_surface),
+            FN_PAIR(surface_make_current),
+            FN_PAIR(surface_present),
+            FN_PAIR(get_proc_addr)
     };
 
     for (usize i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
