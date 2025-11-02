@@ -6,12 +6,20 @@
 #include "types/types.h"
 #include <servers/render_context/render_context.h>
 
+#define GLAD_GL_IMPLEMENTATION
+#include <glad_ogl13/gl.h>
+
 /* ====> Errors <==== */
 
 /* ================== */
 
+static boolean g_gloadLoaded = false;
+
 static void init_glad_cb(void* args, void* ctx) {
-    LOG_WARN("CONTEXT CREATED");
+    if (!gladLoadGL(RenderContext.get_proc_addr)) {
+        LOG_FATAL("OpenGL load error (glad)")
+    }
+    g_gloadLoaded = true;
 }
 
 static boolean _init(void) {

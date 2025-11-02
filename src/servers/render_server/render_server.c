@@ -117,17 +117,7 @@ fptr render_server_backend_get_function(RenderServerBackend* backend, const char
 static boolean backend_set_get(
         RenderServerBackend* backend, const char* name, void (**fn)(void), unsigned char is_set
 ) {
-    typedef void (**FnT)(void);
-    struct FnPair {
-        const char* name;
-        FnT function;
-    };
-
-    // TODO: generate with API Generator
-    const struct FnPair pairs[] = {
-            {"_init", (FnT) &backend->_init},
-            {"_quit", (FnT) &backend->_quit},
-    };
+#include "setget-pairs-table.h.gen"
 
     for (usize i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
         if (!strcmp(name, pairs[i].name)) {

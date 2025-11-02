@@ -131,7 +131,7 @@ static boolean backend_set_get(
         RenderContextBackend* backend, const char* name, void (**fn)(void), unsigned char is_set
 ) {
 #include "setget-pairs-table.h.gen"
-
+  
     for (usize i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
         if (!strcmp(name, pairs[i].name)) {
             if (is_set)
