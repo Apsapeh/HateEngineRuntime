@@ -1,62 +1,51 @@
-name: 🛠️ Generate API on Master
+name: Generate API
 
 on:
-  # 1. Запускается при каждом пуше в 'master'
-  # (Обычно это происходит после мержа PR)
   push:
     branches:
-      - develop
-
-permissions:
-  contents: write
+      - master
+    paths-ignore:
+      - 'include/HateEngineAPI.h'
+      - 'src/api_sym_lookup_table.h'
 
 jobs:
   generate-api:
-    # 2. ❗️ Важно: предотвращаем бесконечный цикл.
-    # Не запускаем, если последний коммит - это коммит от самого бота.
-    if: "!contains(github.event.head_commit.message, '[ci skip]')"
-    
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
     steps:
-      # 3. Забираем код из 'master'
-      - name: ⬇️ Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # Нам нужен коммит, который только что запушили
-          ref: ${{ github.sha }}
-
-      # 4. Устанавливаем uv
-      - name: 🔧 Setup uv
-        uses: astral-sh/setup-uv@v7
-
-      # 5. Запускаем генератор
-      - name: 🐍 Run API Generator
-        run: ./tools/api-generator.py
-
-      # 6. Настраиваем Git
-      - name: 🤖 Configure Git
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-
-      # 7. Коммитим и пушим API файл
-      # создаём новую ветку, коммитим и пушим в неё
-      - name: Create and push api-update branch
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b api-update-${{ github.run_id }}
-          git add .
-          git commit -m "Automated API update from workflow #${{ github.run_id }}" || echo "No changes to commit"
-          git push origin api-update-${{ github.run_id }}
+          token: ${{ secrets.GH_PAT }}
       
-      # создаём PR из этой ветки в master
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          base: master
-          branch: api-update-${{ github.run_id }}
-          title: "Automated API update"
-          body: "This PR updates generated API files."
-          draft: false
+          version: "latest"
+      
+      - name: Run API generator
+        run: |
+          chmod +x ./tools/api-generator.py
+          ./tools/api-generator.py
+      
+      - name: Check for changes
+        id: check_changes
+        run: |
+          git add -f include/HateEngineAPI.h src/api_sym_lookup_table.h
+          if git diff --staged --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Commit and push changes
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git config user.name "API Generator Bot"
+          git config user.email "github-generator-bot@users.noreply.github.com"
+          git commit -m "chore: auto-generate HateEngineAPI.h and api_sym_lookup_table.h [ci skip]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
