@@ -120,28 +120,7 @@ fptr window_server_backend_get_function(WindowServerBackend* backend, const char
 static boolean backend_set_get(
         WindowServerBackend* backend, const char* name, void (**fn)(void), unsigned char is_set
 ) {
-    typedef void (**FnT)(void);
-    struct FnPair {
-        const char* name;
-        FnT function;
-    };
-
-    // TODO: generate with API Generator
-    const struct FnPair pairs[] = {
-            {"_init", (FnT) &backend->_init},
-            {"_quit", (FnT) &backend->_quit},
-            {"create_window", (FnT) &backend->create_window},
-            {"destroy_window", (FnT) &backend->destroy_window},
-            {"window_set_title", (FnT) &backend->window_set_title},
-            {"window_get_title", (FnT) &backend->window_get_title},
-            {"window_set_mode", (FnT) &backend->window_set_mode},
-            {"window_get_mode", (FnT) &backend->window_get_mode},
-            {"window_set_size", (FnT) &backend->window_set_size},
-            {"window_get_size", (FnT) &backend->window_get_size},
-            {"window_set_position", (FnT) &backend->window_set_position},
-            {"window_get_position", (FnT) &backend->window_get_position},
-            // {"window_set_fullscreen_display", (FnT) &backend->window_set_fullscreen_display},
-    };
+#include "setget-pairs-table.h.gen"
 
     for (usize i = 0; i < sizeof(pairs) / sizeof(pairs[0]); i++) {
         if (!strcmp(name, pairs[i].name)) {
