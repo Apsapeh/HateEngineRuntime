@@ -1,0 +1,22 @@
+name: PR Protection
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-auto-merge:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    
+    steps:
+      - name: Disable unauthorized auto-merge
+        if: github.event.pull_request.head.ref == 'api-generator/update-api' && github.event.pull_request.user.login != 'Apsapeh'
+        run: |
+          echo "::error::Unauthorized attempt to use api-generator branch"
+          gh pr ready --undo ${{ github.event.pull_request.number }}
+          gh pr comment ${{ github.event.pull_request.number }} --body "⚠️ This branch is reserved for automated API generation. Please use a different branch name."
+          exit 1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
