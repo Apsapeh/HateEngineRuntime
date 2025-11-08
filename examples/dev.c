@@ -14,6 +14,7 @@ RenderContextSurface* g_surface2;
 PUBLIC void _ready(void) {
     vfs_mount_rfs("/");
 
+    /*
     string* str_hello = string_from("Hello, ");
     string* str_world = string_from("world!!!!");
     string* str_hello_world;
@@ -33,7 +34,7 @@ PUBLIC void _ready(void) {
 
     string_free(str_hello_world);
     string_free(str_hello_world_hand);
-
+    */
 
     printf("wscw: %p\n", (void*) raw_window_server_create_window);
     printf("wswss: %p\n", (void*) raw_window_server_window_set_size);
