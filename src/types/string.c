@@ -92,16 +92,19 @@ char* string_cstr(const String* self) {
     return self->ptr;
 }
 
-boolean string_len(const String* const c_str, u64* dest_len) {
-    ERROR_ARGS_CHECK_2(c_str, dest_len, { return false; });
-    *dest_len = c_str->len;
-    return true;
+u64 string_len(const String* const c_str, boolean* success) {
+    ERROR_ARGS_CHECK_1(c_str, {
+        if (success) {
+            *success = false;
+        }
+    });
+    //*dest_len = c_str->len;
+    if (success) {
+        *success = true;
+    }
+    return c_str->len;
 }
 
-u64 string_size(const String* c_str) {
-    ERROR_ARG_CHECK(c_str, { return 0; });
-    return c_str->len + 1;
-}
 
 boolean string_push_back(String* self, const String* src) {
     ERROR_ARGS_CHECK_2(self, src, { return false; });
@@ -118,9 +121,9 @@ static inline boolean string_push_back_cstr_ex(String* self, const char* src, co
     ERROR_ALLOC_CHECK(tmp_ptr, { return false; });
 
     if (src >= self->ptr && src <= self->ptr + self->len - 1)
-        memcpy(tmp_ptr + self->len, tmp_ptr + (src - self->ptr), len_src); 
+        memcpy(tmp_ptr + self->len, tmp_ptr + (src - self->ptr), len_src);
     else
-        memcpy(tmp_ptr + self->len, src, len_src); 
+        memcpy(tmp_ptr + self->len, src, len_src);
 
     self->ptr = tmp_ptr;
     self->len += len_src;
@@ -170,7 +173,9 @@ boolean string_insert_cstr(String* self, const char* src, const u64 i) {
 }
 
 
-static inline boolean string_insert_cstr_ex(String* self, const char* src, const u64 i, const u64 len_src) {
+static inline boolean string_insert_cstr_ex(
+        String* self, const char* src, const u64 i, const u64 len_src
+) {
     if (i == 0)
         return string_push_front_cstr_ex(self, src, len_src);
 
@@ -303,23 +308,61 @@ boolean string_free(String* self) {
     return true;
 }
 
+boolean string_get_slice_constructor(
+        StringSlice* self, const String* str, const u64 from, const u64 to
+) {
+    ERROR_ARG_CHECK(str, { return false; });
 
-StringSlice* string_get_slice(const String* str, const u64 s, const u64 e) {
-    ERROR_ARG_CHECK(str, { return NULL; });
-
-    if (s >= str->len || e < s || e >= str->len) {
+    if (from >= str->len || to < from || to >= str->len) {
         LOG_ERROR_OR_DEBUG_FATAL("Invalid argument (output for boundary): s or e");
         set_error(ERROR_INVALID_ARGUMENT);
-        return NULL;
+        return false;
     }
 
-    StringSlice* str_sl = tmalloc(sizeof(StringSlice));
-    ERROR_ALLOC_CHECK(str_sl, { return NULL; });
+    self->len = to - from + 1;
+    self->str = str->ptr + from;
 
-    str_sl->len = e - s + 1;
-    str_sl->s = str->ptr + s;
+    return true;
+}
 
-    return str_sl;
+boolean string_slice_from_cstr_constructor(StringSlice* self, const char* c_str, const i64 size) {
+    ERROR_ARGS_CHECK_2(self, c_str, { return false; });
+
+    // Automaticly size calculation
+    if (size == -1)
+        self->len = strlen(c_str);
+    else
+        self->len = size;
+
+    // StringSlice is guarantees, that self->s is read-only
+    self->str = (char*) c_str;
+    return true;
+}
+
+StringSlice* string_get_slice(const String* str, const u64 from, const u64 to) {
+    StringSlice* self = tmalloc(sizeof(StringSlice));
+    ERROR_ALLOC_CHECK(self, { return NULL; });
+
+    boolean status = string_get_slice_constructor(self, str, from, to);
+    if (status) {
+        return self;
+    } else {
+        tfree(self);
+        return NULL;
+    }
+}
+
+StringSlice* string_slice_from_cstr(const char* c_str, const i64 size) {
+    StringSlice* self = tmalloc(sizeof(StringSlice));
+    ERROR_ALLOC_CHECK(self, { return NULL; });
+
+    boolean status = string_slice_from_cstr_constructor(self, c_str, size);
+    if (status) {
+        return self;
+    } else {
+        tfree(self);
+        return NULL;
+    }
 }
 
 String* string_from_slice(const StringSlice* str_sl) {
@@ -334,32 +377,32 @@ String* string_from_slice(const StringSlice* str_sl) {
         return NULL;
     });
 
-    memcpy(str->ptr, str_sl->s, str_sl->len);
+    memcpy(str->ptr, str_sl->str, str_sl->len);
     str->len = str_sl->len;
     *(str->ptr + str->len) = '\0';
 
     return str;
 }
 
-boolean string_equals_slice(StringSlice* str_sl_1, StringSlice* str_sl_2) {
+boolean string_slice_equals(StringSlice* str_sl_1, StringSlice* str_sl_2) {
     ERROR_ARGS_CHECK_2(str_sl_1, str_sl_2, { return false; });
     if (str_sl_1->len != str_sl_2->len)
         return false;
 
-    return memcmp(str_sl_1->s, str_sl_2->s, str_sl_1->len) ? false : true;
+    return memcmp(str_sl_1->str, str_sl_2->str, str_sl_1->len) ? false : true;
 }
 
 boolean string_push_back_slice(String* self, const StringSlice* src) {
     ERROR_ARGS_CHECK_2(self, src, { return false; });
-    return string_push_back_cstr_ex(self, src->s, src->len);
+    return string_push_back_cstr_ex(self, src->str, src->len);
 }
 
 boolean string_push_front_slice(String* self, const StringSlice* src) {
     ERROR_ARGS_CHECK_2(self, src, { return false; });
-    return string_push_front_cstr_ex(self, src->s, src->len);
+    return string_push_front_cstr_ex(self, src->str, src->len);
 }
 
-boolean string_insert_slice(String* self, const StringSlice* src, const usize i) {
+boolean string_insert_slice(String* self, const StringSlice* src, const u64 i) {
     ERROR_ARGS_CHECK_2(self, src, { return false; });
 
     if (i > self->len) {
@@ -368,7 +411,7 @@ boolean string_insert_slice(String* self, const StringSlice* src, const usize i)
         return false;
     }
 
-    return string_insert_cstr_ex(self, src->s, i, src->len);
+    return string_insert_cstr_ex(self, src->str, i, src->len);
 }
 
 boolean string_slice_free(StringSlice* self) {
@@ -435,9 +478,9 @@ static inline StringUTF8* string_utf8_dec(const char* c_str, const u64 len_c_str
         tfree(str_new);
         return NULL;
     });
-    
+
     str_new->len = tmp_ptr - cache;
-    
+
     return str_new;
 }
 
@@ -456,7 +499,7 @@ String* string_utf8_to_string(const StringUTF8* self) {
     u64 size_str = 4 * self->len;
 
     char* cache = tmalloc(size_str); // тут я очень упрощенно создаю кеш, взяв худшую ситуацию, что у нас
-                                   // элементы все по 4 байта (без лишних)
+                                     // элементы все по 4 байта (без лишних)
     ERROR_ALLOC_CHECK(cache, { return NULL; });
 
     char* tmp_ptr = cache;
@@ -520,7 +563,7 @@ String* string_utf8_to_string(const StringUTF8* self) {
 
     str_new->len = size_new_str - 1;
     *(str_new->ptr + str_new->len) = '\0';
-    
+
     return str_new;
 }
 
@@ -578,9 +621,9 @@ static inline boolean string_utf8_push_back_ex(StringUTF8* self, const StringUTF
     ERROR_ALLOC_CHECK(tmp_ptr, { return false; });
 
     if (src->ptr >= self->ptr && src->ptr < self->ptr + self->len)
-        memcpy(tmp_ptr + self->len, tmp_ptr + (src->ptr - self->ptr), size_src); 
+        memcpy(tmp_ptr + self->len, tmp_ptr + (src->ptr - self->ptr), size_src);
     else
-        memcpy(tmp_ptr + self->len, src->ptr, size_src); 
+        memcpy(tmp_ptr + self->len, src->ptr, size_src);
 
     self->ptr = tmp_ptr;
     self->len += src->len;
@@ -642,7 +685,7 @@ static inline boolean string_utf8_push_front_ex(StringUTF8* self, const StringUT
     } else {
         memmove(tmp_ptr + src->len, tmp_ptr, size_dest);
         memcpy(tmp_ptr, src->ptr, size_src);
-    } 
+    }
 
     self->ptr = tmp_ptr;
     self->len += src->len;
@@ -794,3 +837,4 @@ boolean string_utf8_free(StringUTF8* self) {
 
     return true;
 }
+
