@@ -301,6 +301,14 @@ boolean string_equals_cstr(const String* str, const char* c_str) {
     return memcmp(str->ptr, c_str, str->len) ? false : true;
 }
 
+boolean string_equals_slice(const String* str, StringSlice* slice) {
+    ERROR_ARGS_CHECK_2(str, slice, { return false; });
+    if (str->len != slice->len)
+        return false;
+
+    return memcmp(str->ptr, slice->str, str->len) ? false : true;
+}
+
 boolean string_free(String* self) {
     ERROR_ARG_CHECK(self, { return false; });
     tfree(self->ptr);

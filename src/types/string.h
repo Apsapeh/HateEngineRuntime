@@ -196,6 +196,14 @@ boolean string_equals(const String* str1, const String* str2);
 boolean string_equals_cstr(const String* str, const char* c_str);
 
 /**
+ * @breif Compare String and StringSlice
+ *
+ * @error ERROR_INVALID_ARGUMENT
+ * @api
+ */
+boolean string_equals_slice(const String* str, StringSlice* slice);
+
+/**
  * @brief free memory of passed String
  *
  * @error ERROR_INVALID_ARGUMENT
