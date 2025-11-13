@@ -20,9 +20,6 @@ typedef struct {
     usize len;
 } StringSlice;
 
-// TODO: Add _constructor and _destructor methodos. Use for reference
-// src/types/signal.h/signal_constructor and src/types/singal.h/signal_destructor
-// THEY ARE NON-API
 
 // TODO: doc
 boolean string_destructor(String* self);

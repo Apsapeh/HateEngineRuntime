@@ -9,52 +9,91 @@ static inline boolean string_set_cstr_ex(String*, const char*, const u64);
 static inline boolean string_push_back_cstr_ex(String*, const char*, const u64);
 static inline boolean string_utf8_push_back_ex(StringUTF8*, const StringUTF8*);
 static inline boolean string_insert_cstr_ex(String*, const char*, const u64, const u64);
-static inline StringUTF8* string_utf8_dec(const char*, const u64);
+static inline boolean string_utf8_dec(StringUTF8* self, const char*, const u64);
 
-// TODO: impl
 boolean string_destructor(String* self) {
-    return false;
+    ERROR_ARG_CHECK(self, { return false; });
+    tfree(self->ptr);
+    return true;
 }
 
-// TODO: Impl
 boolean string_constructor(String* self) {
+    ERROR_ARG_CHECK(self, { return false; });
+
+    self->ptr = tmalloc(sizeof(char));
+    ERROR_ALLOC_CHECK(self->ptr, { return false; });
+
+    *(self->ptr) = '\0';
+    self->len = 0;
+
     return false;
 }
 
-// TODO: Impl
 boolean string_from_constructor(String* self, const char* c_str) {
-    return false;
+    ERROR_ARGS_CHECK_2(self, c_str, { return false; });
+
+    self->len = strlen(c_str);
+    self->ptr = tmalloc(self->len + 1);
+    ERROR_ALLOC_CHECK(self->ptr, { return false; });
+
+    memcpy(self->ptr, c_str, self->len + 1);
+
+    return true;
 }
 
-// TODO: Impl
 boolean string_from_slice_constructor(String* self, const StringSlice* slice) {
-    return false;
+    ERROR_ARGS_CHECK_2(self, slice, { return false; });
+
+    self->ptr = tmalloc(slice->len + 1);
+    ERROR_ALLOC_CHECK(self->ptr, { return false; });
+
+    memcpy(self->ptr, slice->str, slice->len);
+    self->len = slice->len;
+    *(self->ptr + self->len) = '\0';
+
+    return true;
 }
 
-// TODO: Impl
 boolean string_clone_constructor(String* self, const String* string) {
-    return false;
+    ERROR_ARGS_CHECK_2(self, string, { return false; });
+
+    self->len = string->len;
+    self->ptr = tmalloc(string->len + 1);
+    ERROR_ALLOC_CHECK(self->ptr, { return false; });
+
+    memcpy(self->ptr, string->ptr, string->len + 1);
+
+    return true;
 }
 
 
 boolean string_free(String* self) {
     ERROR_ARG_CHECK(self, { return false; });
-    tfree(self->ptr);
+    if (!string_destructor(self))
+        return false;
+
     tfree(self);
     return true;
 }
+
+#define CONSTRUCTOR_CHECK(fn, var, bad_block)                                                           \
+    do {                                                                                                \
+        boolean status = fn;                                                                            \
+        if (status) {                                                                                   \
+            return var;                                                                                 \
+        } else {                                                                                        \
+            bad_block                                                                                   \
+        }                                                                                               \
+    } while (0)
 
 String* string_new(void) {
     String* str_new = tmalloc(sizeof(String));
     ERROR_ALLOC_CHECK(str_new, { return NULL; });
 
-    str_new->ptr = tmalloc(sizeof(char));
-    ERROR_ALLOC_CHECK(str_new, { return NULL; });
-
-    *(str_new->ptr) = '\0';
-    str_new->len = 0;
-
-    return str_new;
+    CONSTRUCTOR_CHECK(string_constructor(str_new), str_new, {
+        tfree(str_new);
+        return NULL;
+    });
 }
 
 String* string_from(const char* c_str) {
@@ -63,54 +102,35 @@ String* string_from(const char* c_str) {
     String* str = tmalloc(sizeof(String));
     ERROR_ALLOC_CHECK(str, { return NULL; });
 
-    u64 c_str_len = strlen(c_str);
-    str->ptr = tmalloc(c_str_len + 1);
-    ERROR_ALLOC_CHECK(str->ptr, {
+    CONSTRUCTOR_CHECK(string_from_constructor(str, c_str), str, {
         tfree(str);
         return NULL;
     });
-
-    str->len = c_str_len;
-    memcpy(str->ptr, c_str, c_str_len + 1);
-
-    return str;
 }
 
-String* string_from_slice(const StringSlice* str_sl) {
-    ERROR_ARG_CHECK(str_sl, { return NULL; });
+String* string_from_slice(const StringSlice* slice) {
+    ERROR_ARG_CHECK(slice, { return NULL; });
 
     String* str = tmalloc(sizeof(String));
     ERROR_ALLOC_CHECK(str, { return NULL; });
 
-    str->ptr = tmalloc(str_sl->len + 1);
-    ERROR_ALLOC_CHECK(str->ptr, {
+
+    CONSTRUCTOR_CHECK(string_from_slice_constructor(str, slice), str, {
         tfree(str);
         return NULL;
     });
-
-    memcpy(str->ptr, str_sl->str, str_sl->len);
-    str->len = str_sl->len;
-    *(str->ptr + str->len) = '\0';
-
-    return str;
 }
 
-String* string_clone(const String* str) {
-    ERROR_ARG_CHECK(str, { return NULL; });
+String* string_clone(const String* other_string) {
+    ERROR_ARG_CHECK(other_string, { return NULL; });
 
-    String* str_new = tmalloc(sizeof(String));
-    ERROR_ALLOC_CHECK(str_new, { return NULL; });
+    String* str = tmalloc(sizeof(String));
+    ERROR_ALLOC_CHECK(str, { return NULL; });
 
-    str_new->ptr = tmalloc(str->len + 1);
-    ERROR_ALLOC_CHECK(str_new->ptr, {
-        tfree(str_new);
+    CONSTRUCTOR_CHECK(string_clone_constructor(str, other_string), str, {
+        tfree(str);
         return NULL;
     });
-
-    str_new->len = str->len;
-    memcpy(str_new->ptr, str->ptr, str->len + 1);
-
-    return str_new;
 }
 
 static inline boolean string_set_cstr_ex(String* self, const char* c_str, const u64 len_c_str) {
@@ -415,66 +435,14 @@ boolean string_slice_free(StringSlice* self) {
 
 //<--------------------------- UTF-8 --------------------------->
 
-// TODO: Impl
-boolean string_utf8_destructor(StringUTF8* self) {
-    return false;
-}
 
-// TODO: impl
-boolean string_utf8_constructor(StringUTF8* self) {
-    return false;
-}
-
-// TODO: impl
-boolean string_utf8_from_constructor(StringUTF8* self, const char* c_str) {
-    return false;
-}
-
-// TODO: impl
-boolean string_utf8_from_string_constructor(StringUTF8* self, const String* string) {
-    return false;
-}
-
-// TODO: impl
-boolean string_utf8_from_slice_constructor(StringUTF8* self, const StringSlice* slice) {
-    return false;
-}
-
-// TODO: impl
-boolean string_utf8_clone_constructor(StringUTF8* self, const StringUTF8* other_string) {
-    return false;
-}
-
-
-boolean string_utf8_free(StringUTF8* self) {
-    ERROR_ARG_CHECK(self, { return false; });
-    tfree(self->ptr);
-    tfree(self);
-
-    return true;
-}
-
-StringUTF8* string_utf8_new(void) {
-    StringUTF8* str_new = tmalloc(sizeof(StringUTF8));
-    ERROR_ALLOC_CHECK(str_new, { return NULL; });
-
-    str_new->len = 0;
-    str_new->ptr = NULL;
-
-    return str_new;
-}
-
-
-static inline StringUTF8* string_utf8_dec(const char* c_str, const u64 len_c_str) {
+static inline boolean string_utf8_dec(StringUTF8* self, const char* c_str, const u64 len_c_str) {
     if (len_c_str == 0) {
-        return string_utf8_new();
+        return string_utf8_constructor(self);
     }
 
     u32* cache = tmalloc(sizeof(u32) * len_c_str);
-    ERROR_ALLOC_CHECK(cache, { return NULL; });
-
-    StringUTF8* str_new = tmalloc(sizeof(StringUTF8));
-    ERROR_ALLOC_CHECK(str_new, { return NULL; });
+    ERROR_ALLOC_CHECK(cache, { return false; });
 
     u32* tmp_ptr = cache;
 
@@ -499,37 +467,118 @@ static inline StringUTF8* string_utf8_dec(const char* c_str, const u64 len_c_str
             LOG_ERROR_OR_DEBUG_FATAL("Invalid argument 'c_str': Incorrect UTF8-format");
             set_error(ERROR_INVALID_ARGUMENT);
             tfree(cache);
-            tfree(str_new);
-            return NULL;
+            return false;
         }
     }
 
     usize size_new_str = sizeof(u32) * (tmp_ptr - cache); // размер получившейся строки в байтах
-    str_new->ptr = trealloc(cache, size_new_str);
-    ERROR_ALLOC_CHECK(str_new->ptr, {
+    self->ptr = trealloc(cache, size_new_str);
+    ERROR_ALLOC_CHECK(self->ptr, {
         tfree(cache);
+        return false;
+    });
+
+    self->len = tmp_ptr - cache;
+
+    return true;
+}
+
+//
+
+boolean string_utf8_destructor(StringUTF8* self) {
+    ERROR_ARG_CHECK(self, { return false; });
+    tfree(self->ptr);
+
+    return true;
+}
+
+boolean string_utf8_constructor(StringUTF8* self) {
+    ERROR_ARG_CHECK(self, { return false; });
+    self->len = 0;
+    self->ptr = NULL;
+    return true;
+}
+
+boolean string_utf8_from_constructor(StringUTF8* self, const char* c_str) {
+    ERROR_ARGS_CHECK_2(self, c_str, { return false; });
+    return string_utf8_dec(self, c_str, strlen(c_str));
+}
+
+boolean string_utf8_from_string_constructor(StringUTF8* self, const String* string) {
+    ERROR_ARGS_CHECK_2(self, string, { return false; });
+    return string_utf8_dec(self, string->ptr, string->len);
+}
+
+boolean string_utf8_from_slice_constructor(StringUTF8* self, const StringSlice* slice) {
+    ERROR_ARGS_CHECK_2(self, slice, { return false; });
+    return string_utf8_dec(self, slice->str, slice->len);
+}
+
+boolean string_utf8_clone_constructor(StringUTF8* self, const StringUTF8* str) {
+    ERROR_ARGS_CHECK_2(self, str, { return false; });
+
+    u64 size_str = sizeof(u32) * str->len;
+    self->ptr = tmalloc(size_str);
+    ERROR_ALLOC_CHECK(self->ptr, { return false; });
+
+    self->len = str->len;
+    memcpy(self->ptr, str->ptr, size_str);
+
+    return true;
+}
+
+
+boolean string_utf8_free(StringUTF8* self) {
+    ERROR_ARG_CHECK(self, { return false; });
+    if (!string_utf8_destructor(self))
+        return false;
+    tfree(self);
+
+    return true;
+}
+
+StringUTF8* string_utf8_new(void) {
+    StringUTF8* str_new = tmalloc(sizeof(StringUTF8));
+    ERROR_ALLOC_CHECK(str_new, { return NULL; });
+
+    CONSTRUCTOR_CHECK(string_utf8_constructor(str_new), str_new, {
         tfree(str_new);
         return NULL;
     });
-
-    str_new->len = tmp_ptr - cache;
-
-    return str_new;
 }
+
 
 StringUTF8* string_utf8_from(const char* c_str) {
     ERROR_ARG_CHECK(c_str, { return NULL; });
-    return string_utf8_dec(c_str, strlen(c_str));
+    StringUTF8* str_new = tmalloc(sizeof(StringUTF8));
+    ERROR_ALLOC_CHECK(str_new, { return NULL; });
+
+    CONSTRUCTOR_CHECK(string_utf8_from_constructor(str_new, c_str), str_new, {
+        tfree(str_new);
+        return NULL;
+    });
 }
 
 StringUTF8* string_utf8_from_string(const String* string) {
     ERROR_ARG_CHECK(string, { return NULL; });
-    return string_utf8_dec(string->ptr, string->len);
+    StringUTF8* str_new = tmalloc(sizeof(StringUTF8));
+    ERROR_ALLOC_CHECK(str_new, { return NULL; });
+
+    CONSTRUCTOR_CHECK(string_utf8_from_string_constructor(str_new, string), str_new, {
+        tfree(str_new);
+        return NULL;
+    });
 }
 
 StringUTF8* string_utf8_from_slice(const StringSlice* slice) {
     ERROR_ARG_CHECK(slice, { return NULL; });
-    return string_utf8_dec(slice->str, slice->len);
+    StringUTF8* str_new = tmalloc(sizeof(StringUTF8));
+    ERROR_ALLOC_CHECK(str_new, { return NULL; });
+
+    CONSTRUCTOR_CHECK(string_utf8_from_slice_constructor(str_new, slice), str_new, {
+        tfree(str_new);
+        return NULL;
+    });
 }
 
 StringUTF8* string_utf8_clone(const StringUTF8* str) {
@@ -538,17 +587,10 @@ StringUTF8* string_utf8_clone(const StringUTF8* str) {
     StringUTF8* str_new = tmalloc(sizeof(String));
     ERROR_ALLOC_CHECK(str_new, { return NULL; });
 
-    u64 size_str = sizeof(u32) * str->len;
-    str_new->ptr = tmalloc(size_str);
-    ERROR_ALLOC_CHECK(str_new->ptr, {
+    CONSTRUCTOR_CHECK(string_utf8_clone_constructor(str_new, str), str_new, {
         tfree(str_new);
         return NULL;
     });
-
-    str_new->len = str->len;
-    memcpy(str_new->ptr, str->ptr, size_str);
-
-    return str_new;
 }
 
 String* string_utf8_to_string(const StringUTF8* self) {
