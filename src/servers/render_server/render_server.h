@@ -11,104 +11,180 @@
 
 /*
 API ENUM {
-        "name": "RenderServerDataOwnMode",
-        "type": "char",
+        "name": "RenderServerBufferUsageHint",
+        "type": "u8",
         "values": [
-                ["Copy", "'\\0'"],
-                ["Borrow", "'w'"],
-                ["Ptr", "'f'"]
+                ["Static", 0],
+                ["Dynamic", 1],
+                ["Stream", 2]
         ]
 }
 */
 
 // clang-format off
-#define RENDER_SERVER_DATA_OWN_MODE_COPY   '\0'
-#define RENDER_SERVER_DATA_OWN_MODE_BORROW 'w'
-#define RENDER_SERVER_DATA_OWN_MODE_PTR    'f'
+#define RENDER_SERVER_BUFFER_USAGE_HINT_STATIC 0
+#define RENDER_SERVER_BUFFER_USAGE_HINT_DYNAMIC 1
+#define RENDER_SERVER_BUFFER_USAGE_HINT_STREAM 2
+#define RENDER_SERVER_BUFFER_USAGE_HINT_FIRST RENDER_SERVER_BUFFER_USAGE_HINT_STATIC
+#define RENDER_SERVER_BUFFER_USAGE_HINT_LAST RENDER_SERVER_BUFFER_USAGE_HINT_STREAM
 // clang-format on
 
 /**
- * '\0' or 'c' - Data may be copied, may be not, depending on the backend implementation.
- * RenderServer will own this data
+ * 0 - Buffer will be setted once and naver changed.
+ *     Use for static meshes like level, level environment, etc.
  *
- * 'b' - Data will be borrowed. RenderServer will own this data
+ * 1 - Buffer will be sometimes change
+ *     Use for maybe minecraft-like chunks, idk
  *
- * 'p' - Data can be stored as a pointer without copying. Render server is not ownes data
+ * 2 - Buffer will be changed every few frames
+ *     Use for particles
  *
  * @api
  */
-typedef char RenderServerDataOwnMode;
+typedef char RenderServerBufferUsageHint;
+
+
+/*
+API ENUM {
+        "name": "RenderServerBufferType",
+        "type": "u8",
+        "values": [
+                ["Vertex", 0],
+                ["Index", 1],
+                ["Normal", 2]
+        ]
+}
+*/
+
+// clang-format off
+#define RENDER_SERVER_BUFFER_TYPE_VRTEX 0
+#define RENDER_SERVER_BUFFER_TYPE_INDEX 1
+#define RENDER_SERVER_BUFFER_TYPE_NORMAL 2
+#define RENDER_SERVER_BUFFER_TYPE_FIRST RENDER_SERVER_BUFFER_USAGE_HINT_VERTEX
+#define RENDER_SERVER_BUFFER_TYPE_LAST RENDER_SERVER_BUFFER_USAGE_HINT_NORMAL
+// clang-format on
+
+/**
+ * 0 - Vertices. Float types
+ *
+ * 1 - Indices. Indeger types
+ *
+ * 2 - Normals. Float types. Must be normalized
+ *
+ * @api
+ */
+typedef char RenderServerBufferUsageHint;
 
 
 /*
 API ENUM {
         "name": "RenderServerDataType",
-        "type": "char",
+        "type": "u8",
         "values": [
-                ["F32", "'f'"],
-                ["F64", "'d'"],
-                ["I8",  "'b'"],
-                ["I16", "'s'"],
-                ["I32", "'i'"],
-                ["U8",  "'B'"],
-                ["U16", "'S'"],
-                ["U32", "'I'"]
+                ["F32", 0],
+                ["F64", 1],
+                ["I8",  2],
+                ["I16", 3],
+                ["I32", 4],
+                ["U8",  5],
+                ["U16", 6],
+                ["U32", 7]
         ]
 }
 */
 
 // clang-format off
-#define RENDER_SERVER_DATA_TYPE_F32 'f'
-#define RENDER_SERVER_DATA_TYPE_F64 'd'
-#define RENDER_SERVER_DATA_TYPE_I8  'b'
-#define RENDER_SERVER_DATA_TYPE_I16 's'
-#define RENDER_SERVER_DATA_TYPE_I32 'i'
-#define RENDER_SERVER_DATA_TYPE_U8  'B'
-#define RENDER_SERVER_DATA_TYPE_U16 'S'
-#define RENDER_SERVER_DATA_TYPE_U32 'I'
+#define RENDER_SERVER_DATA_TYPE_F32 0
+#define RENDER_SERVER_DATA_TYPE_F64 1
+#define RENDER_SERVER_DATA_TYPE_I8  2
+#define RENDER_SERVER_DATA_TYPE_I16 3
+#define RENDER_SERVER_DATA_TYPE_I32 4
+#define RENDER_SERVER_DATA_TYPE_U8  5
+#define RENDER_SERVER_DATA_TYPE_U16 6
+#define RENDER_SERVER_DATA_TYPE_U32 7
+#define RENDER_SERVER_DATA_TYPE_FIRST RENDER_SERVER_DATA_TYPE_F32
+#define RENDER_SERVER_DATA_TYPE_LAST  RENDER_SERVER_DATA_TYPE_U32
 // clang-format on
 
 /**
- * 'f' - f32, 4 bytes float point
- * 'd' - f64, 8 bytes float point
- * 'b' - i8,  1 byte signed integer
- * 's' - i16, 2 byte signed integer
- * 'i' - i32, 4 byte signed integer
- * 'B' - u8,  1 byte unsigned integer
- * 'S' - u16, 2 byte unsigned integer
- * 'I' - u32, 4 byte unsigned integer
+ * 0 - f32, 4 bytes float point
+ * 1 - f64, 8 bytes float point
+ * 2 - i8,  1 byte signed integer
+ * 3 - i16, 2 byte signed integer
+ * 4 - i32, 4 byte signed integer
+ * 5 - u8,  1 byte unsigned integer
+ * 6 - u16, 2 byte unsigned integer
+ * 7 - u32, 4 byte unsigned integer
  *
  * @api
  */
-typedef char RenderServerDataType;
+typedef u8 RenderServerDataType;
+
+
+/*
+API ENUM {
+        "name": "RenderServerDataOwnMode",
+        "type": "u8",
+        "values": [
+                ["Copy", 0],
+                ["Borrow", 1],
+                ["Ptr", 2]
+        ]
+}
+*/
+
+// clang-format off
+#define RENDER_SERVER_DATA_OWN_MODE_COPY   0
+#define RENDER_SERVER_DATA_OWN_MODE_BORROW 1
+#define RENDER_SERVER_DATA_OWN_MODE_PTR    2
+#define RENDER_SERVER_DATA_OWN_MODE_FIRST RENDER_SERVER_DATA_OWN_MODE_COPY
+#define RENDER_SERVER_DATA_OWN_MODE_LAST  RENDER_SERVER_DATA_OWN_MODE_PTR
+// clang-format on
+
+/**
+ * 0 - Data may be copied, may be not, depending on the backend implementation.
+ * RenderServer will own this data
+ *
+ * 1 - Data will be borrowed. RenderServer will own this data
+ *
+ * 2 - Data can be stored as a pointer without copying. Render server is not ownes data
+ *
+ * @api
+ */
+typedef u8 RenderServerDataOwnMode;
 
 
 /**
  * @api
  */
-typedef chunk_allocator_ptr RenderServerWorldCPtr;
+typedef chunk_allocator_ptr RenderServerWorldHandle;
 
 /**
  * @api
  */
-typedef chunk_allocator_ptr RenderServerInstanceCPtr;
+typedef chunk_allocator_ptr RenderServerInstanceHandle;
 
 /**
  * @api
  */
-typedef chunk_allocator_ptr RenderServerMeshCPtr;
+typedef chunk_allocator_ptr RenderServerMeshHandle;
 
 /**
  * @api
  */
-typedef chunk_allocator_ptr RenderServerMaterialCPtr;
+typedef chunk_allocator_ptr RenderServerBufferHandle;
+
+/**
+ * @api
+ */
+typedef chunk_allocator_ptr RenderServerMaterialHandle;
 
 /**
  * @brief
  *
  * @api
  */
-typedef chunk_allocator_ptr RenderServerTextureCPtr;
+typedef chunk_allocator_ptr RenderServerTextureHandle;
 
 /**
  * @api server
@@ -136,51 +212,56 @@ typedef struct {
     //
 
     // World (contains all data to draw)
-    RenderServerWorldCPtr (*world_create)(void);
-    boolean (*world_add_instace)(RenderServerWorldCPtr world, RenderServerInstanceCPtr instance);
-    boolean (*world_del_instace)(RenderServerWorldCPtr world, RenderServerInstanceCPtr instance);
-    boolean (*world_set_ambient_color)(RenderServerWorldCPtr world, Vec4 color);
-    boolean (*world_destroy)(RenderServerWorldCPtr world);
+    RenderServerWorldHandle (*world_create)(void);
+    boolean (*world_add_instace)(RenderServerWorldHandle world, RenderServerInstanceHandle instance);
+    boolean (*world_del_instace)(RenderServerWorldHandle world, RenderServerInstanceHandle instance);
+    boolean (*world_set_ambient_color)(RenderServerWorldHandle world, Vec4 color);
+    boolean (*world_destroy)(RenderServerWorldHandle world);
 
     // Instance (contains mesh, material, transform)
-    RenderServerInstanceCPtr (*instance_create)(void);
-    boolean (*instance_set_mesh)(RenderServerInstanceCPtr instance, RenderServerMeshCPtr mesh);
-    boolean (*instance_set_material)(RenderServerInstanceCPtr instance, RenderServerMeshCPtr material);
-    boolean (*instance_set_transform)(RenderServerInstanceCPtr instance, Mat4 trasform);
-    boolean (*instance_destroy)(RenderServerInstanceCPtr instance);
+    RenderServerInstanceHandle (*instance_create)(void);
+    boolean (*instance_set_mesh)(RenderServerInstanceHandle instance, RenderServerMeshHandle mesh);
+    boolean (*instance_set_material)(
+            RenderServerInstanceHandle instance, RenderServerMeshHandle material
+    );
+    boolean (*instance_set_transform)(RenderServerInstanceHandle instance, Mat4 trasform);
+    boolean (*instance_destroy)(RenderServerInstanceHandle instance);
 
     // Mesh
-    RenderServerMeshCPtr (*mesh_create)(void);
+    RenderServerMeshHandle (*mesh_create)(void);
+    /**
+     * @param type contains only float types 'fd'
+     */
+    boolean (*mesh_set_vertices_buffer)(RenderServerMeshHandle ptr, RenderServerBufferHandle buffer);
     /**
      * @param type contains only integer types 'bsiBSI'
      */
-    boolean (*mesh_set_vertices)(
-            RenderServerMeshCPtr ptr, const u8* const data, u64 size, RenderServerDataType type,
-            RenderServerDataOwnMode data_own_mode
+    boolean (*mesh_set_indices_buffer)(RenderServerMeshHandle ptr, RenderServerBufferHandle buffer);
+    boolean (*mesh_destroy)(RenderServerMeshHandle ptr);
+
+    // Buffer
+    RenderServerBufferHandle (*buffer_create)(void);
+    boolean (*buffer_set_data)(
+            RenderServerBufferHandle ptr, const void* data, u64 data_size_in_bytes,
+            RenderServerDataType data_type, RenderServerDataOwnMode data_own_mode,
+            RenderServerBufferUsageHint usage_hint
     );
-    /**
-     * @param type contains only integer types 'bsiBSI'
-     */
-    boolean (*mesh_set_indices)(
-            RenderServerMeshCPtr ptr, const u8* const data, u64 size, RenderServerDataType type,
-            RenderServerDataOwnMode data_own_mode
-    );
-    boolean (*mesh_destroy)(RenderServerMeshCPtr ptr);
+    boolean (*buffer_destroy)(RenderServerBufferHandle ptr);
 
     // Material
-    RenderServerMaterialCPtr (*material_create)(void);
+    RenderServerMaterialHandle (*material_create)(void);
     boolean (*material_set_albedo_texture)(
-            RenderServerMaterialCPtr ptr, RenderServerTextureCPtr texture_rid
+            RenderServerMaterialHandle ptr, RenderServerTextureHandle texture_rid
     );
-    boolean (*material_destroy)(RenderServerMaterialCPtr ptr);
+    boolean (*material_destroy)(RenderServerMaterialHandle ptr);
 
     // Texture
-    RenderServerTextureCPtr (*texture_create)(void);
+    RenderServerTextureHandle (*texture_create)(void);
     boolean (*texture_set_data)(
-            RenderServerTextureCPtr ptr, const u8* const data, IVec2 dimensions,
+            RenderServerTextureHandle ptr, const u8* const data, IVec2 dimensions,
             RenderServerDataOwnMode data_own_mode
     );
-    boolean (*texture_destroy)(RenderServerTextureCPtr ptr);
+    boolean (*texture_destroy)(RenderServerTextureHandle ptr);
 
 } RenderServerBackend;
 

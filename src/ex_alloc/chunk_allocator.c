@@ -110,7 +110,7 @@ boolean chunk_memory_allocator_free(ChunkMemoryAllocator* self) {
 /**
  * @api
  */
-chunk_allocator_ptr chunk_memory_allocator_alloc_mem(ChunkMemoryAllocator* this) {
+chunk_allocator_ptr chunk_memory_allocator_alloc_mem(ChunkMemoryAllocator* this, void** real_ptr_out) {
     ERROR_ARG_CHECK(this, return 0;);
     // Find a free chunk
     for (usize c_i = 0; c_i < this->chunks.size; c_i++) {
@@ -118,6 +118,9 @@ chunk_allocator_ptr chunk_memory_allocator_alloc_mem(ChunkMemoryAllocator* this)
             this->chunks.data[c_i] = tmalloc(this->chunk_element_count * this->element_size);
             ERROR_ALLOC_CHECK(this->chunks.data[c_i], { return 0; });
             this->chunks_bitfield.data[c_i * this->chunk_bitfield_size] = 1;
+            if (real_ptr_out) {
+                *real_ptr_out = (char*) this->chunks.data[c_i];
+            }
             return c_i * this->chunk_element_count + 1;
         }
 
@@ -127,6 +130,10 @@ chunk_allocator_ptr chunk_memory_allocator_alloc_mem(ChunkMemoryAllocator* this)
 #if (defined(__GNUC__) || defined(__clang__))
                 usize free_bit = __builtin_ctz(~bitfield[b_i]);
                 bitfield[b_i] |= 1 << free_bit;
+                if (real_ptr_out) {
+                    *real_ptr_out =
+                            (char*) this->chunks.data[c_i] + (b_i * 8 + free_bit) * this->element_size;
+                }
                 return c_i * this->chunk_element_count + b_i * 8 + free_bit + 1;
 #else
                 usize free_bit = 0;
@@ -134,6 +141,10 @@ chunk_allocator_ptr chunk_memory_allocator_alloc_mem(ChunkMemoryAllocator* this)
                     free_bit++;
                 }
                 bitfield[b_i] |= 1 << free_bit;
+                if (real_ptr_out) {
+                    *real_ptr_out =
+                            (char*) this->chunks.data[c_i] + (b_i * 8 + free_bit) * this->element_size;
+                }
                 return c_i * this->chunk_element_count + b_i * 8 + free_bit + 1;
 #endif
             }
@@ -166,6 +177,9 @@ chunk_allocator_ptr chunk_memory_allocator_alloc_mem(ChunkMemoryAllocator* this)
     }
 
     this->chunks_bitfield.data[(this->chunks.size - 1) * this->chunk_bitfield_size] = 1;
+    if (real_ptr_out) {
+        *real_ptr_out = (char*) this->chunks.data[this->chunks.size - 1];
+    }
     return (this->chunks.size - 1) * this->chunk_element_count + 1;
 }
 
@@ -255,7 +269,7 @@ void* chunk_memory_allocator_get_real_ptr(ChunkMemoryAllocator* this, chunk_allo
     const u8 bit_mask = 1 << bit_index;
 
     if (this->chunks_bitfield.data[bitfield_index + byte_index] & bit_mask) {
-        return (u8*) this->chunks.data[chunk_index] + element_in_chunk * this->element_size;
+        return (char*) this->chunks.data[chunk_index] + element_in_chunk * this->element_size;
     }
     return NULL;
 }

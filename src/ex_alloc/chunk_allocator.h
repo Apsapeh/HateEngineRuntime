@@ -73,12 +73,13 @@ boolean chunk_memory_allocator_free(ChunkMemoryAllocator* this);
 /**
  * @return 0 on failure
  *
+ * @param [out] real_ptr Ptr to real memory. Can be NULL
  *
  * @error "InvalidArgument"
  * @error "AllocationFailed" Real memory can't be allocated
  * @api
  */
-chunk_allocator_ptr chunk_memory_allocator_alloc_mem(ChunkMemoryAllocator* this);
+chunk_allocator_ptr chunk_memory_allocator_alloc_mem(ChunkMemoryAllocator* this, void** real_ptr);
 
 /**
  * @error "InvalidArgument"

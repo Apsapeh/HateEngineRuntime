@@ -1,4 +1,4 @@
-#include "render_server_opengl_13.h"
+#include "render_server_sync.h"
 #include "ex_alloc/chunk_allocator.h"
 #include "platform/memory.h"
 #include "platform/mutex.h"
@@ -30,13 +30,14 @@ struct Mesh {
 
 struct Buffer {
     void* ptr;
-    //    u64 size;
+    //    u64 size
     RenderServerBufferDataType data_type;
     RenderServerDataOwnMode own_mode;
 };
 
 /* =========================================================================== */
 
+//
 
 /* ============================= Global Varibales ============================= */
 static boolean g_gladLoaded = false;
@@ -151,7 +152,7 @@ static boolean buffer_set_data(
 
     if (usage_hint < RENDER_SERVER_BUFFER_USAGE_HINT_FIRST ||
         usage_hint > RENDER_SERVER_BUFFER_USAGE_HINT_LAST) {
-        LOG_ERROR("RenderServer::buffer_set_data: Unknown 'data_own_mode' - %d", data_own_mode);
+        LOG_ERROR("RenderServer::buffer_set_data: Unknown 'usage_hint' - %d", data_own_mode);
         set_error(ERROR_INVALID_ARGUMENT);
         return false;
     }
