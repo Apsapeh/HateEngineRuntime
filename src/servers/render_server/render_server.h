@@ -57,7 +57,7 @@ API ENUM {
 */
 
 // clang-format off
-#define RENDER_SERVER_BUFFER_TYPE_VRTEX 0
+#define RENDER_SERVER_BUFFER_TYPE_VERTEX 0
 #define RENDER_SERVER_BUFFER_TYPE_INDEX 1
 #define RENDER_SERVER_BUFFER_TYPE_NORMAL 2
 #define RENDER_SERVER_BUFFER_TYPE_FIRST RENDER_SERVER_BUFFER_USAGE_HINT_VERTEX
@@ -73,7 +73,7 @@ API ENUM {
  *
  * @api
  */
-typedef char RenderServerBufferUsageHint;
+typedef char RenderServerBufferType;
 
 
 /*
@@ -300,6 +300,50 @@ boolean render_server_load_backend(const char* name);
  * @brief If backend was loaded
  */
 boolean render_server_is_loaded(void);
+
+
+/* ====================> RenderServer Async functions <==================== */
+/**
+ * @brief Defferud Function template
+ *
+ * @api
+ */
+typedef void (*CallDefferedRenderThreadFunctionPointer)(void* ctx);
+
+void render_server_begin_frame(void);
+
+void render_server_end_frame(void);
+
+/**
+ * @brief Call some function in the begin of next iteration of the render thread
+ * @warning If used 'sync' mode, function will be called immediatly
+ *
+ * @param[in] function - your function to call
+ * @param[in] ctx - your data. Just raw pointer, you can pass what you want
+ *
+ * Puts your function to the render's thread call queue.
+ *
+ * Example:
+ *  You have a three functions:
+ *      load_texture() - which loads a texture from HDD to VRAM
+ *      load_mesh() - which loads mesh data (some buffers, like Vertices, indices, etc.) to VRAM
+ *      create_instance() - which create new render instance with loaded texture and mesh data
+ *
+ *  In your logic code, when somebody (player) press key 'A', you call this functions in right order:
+ *      call_deferred_render_thread(load_texture, &ctx);
+ *      call_deferred_render_thread(load_mesh, &ctx);
+ *      call_deferred_render_thread(create_instance, &ctx);
+ *
+ *  These functions will be added to the queue and will be executed with next render thread iteration
+ *      load_texture -> load_mesh -> create_instance
+ *
+ *  And, yeah, it's manual memory management. You should manually create and destroy context
+ *
+ * @error InvalidArgument
+ *
+ * @api
+ */
+boolean call_deferred_render_thread(CallDefferedRenderThreadFunctionPointer function, void* ctx);
 
 
 /* ====================> RenderServerBackend functions <==================== */

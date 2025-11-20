@@ -79,6 +79,12 @@ boolean render_server_is_loaded(void) {
 }
 
 
+/* ====================> RenderServer Async functions <==================== */
+boolean call_deferred_render_thread(CallDefferedRenderThreadFunctionPointer function, void* ctx) {
+    return true;
+}
+
+
 /* ====================> RenderServerBackend functions <==================== */
 static boolean backend_set_get(
         RenderServerBackend* backend, const char* name, void (**fn)(void), unsigned char is_set
