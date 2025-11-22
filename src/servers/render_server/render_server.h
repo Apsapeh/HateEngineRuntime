@@ -266,6 +266,27 @@ typedef struct {
 } RenderServerBackend;
 
 
+// API START
+
+// clang-format off
+#define RENDER_SERVER_THREAD_MODE_SYNC   0
+#define RENDER_SERVER_THREDA_MODE_ASYNC  1
+#define RENDER_SERVER_THREAD_MODE_FIRST RENDER_SERVER_THREAD_MODE_SYNC
+#define RENDER_SERVER_THREAD_MODE_LAST  RENDER_SERVER_THREDA_MODE_ASYNC
+// clang-format on
+
+// API END
+
+/**
+ * 0 - Rendering and game logic runs in one thread
+ *
+ * 1 - Rengering and game logic runs in separated threads
+ *
+ * @api
+ */
+typedef u8 RenderServerThreadMode;
+
+
 // Static global RenderServer
 extern RenderServerBackend RenderServer;
 
@@ -288,23 +309,30 @@ boolean render_server_register_backend(const char* name, RenderServerBackend* ba
 /**
  * @brief Load a backend. First you should register them via render_server_register_backend
  * @warning If the backend is already loaded, this function does nothing.
- * @return "InvalidArgument" if name is NULL
+ * @return "InvalidArgument" if name is NULL or th_mode is unknown
  * @return "NotFound" if a backend with the given name is not registered
  * @return "InvalidState" if the backend is already loaded
  *
  * @api
  */
-boolean render_server_load_backend(const char* name);
+boolean render_server_load_backend(const char* name, RenderServerThreadMode th_mode);
 
 /**
  * @brief If backend was loaded
  */
 boolean render_server_is_loaded(void);
 
+/**
+ * @brief Return thread mode of render server. Render server should be loaded.
+ *
+ * @api
+ */
+RenderServerThreadMode render_server_get_thread_mode(void);
+
 
 /* ====================> RenderServer Async functions <==================== */
 /**
- * @brief Defferud Function template
+ * @brief Deffered Function template
  *
  * @api
  */

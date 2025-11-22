@@ -37,10 +37,13 @@ log_full_trace_info log_full_trace_get_info(void);
 
 #ifdef HE_DEBUG
     #define LOG_DEBUG(...) __he_log_debug(__LINE__, __FILE__, __VA_ARGS__);
+    #define LOG_WARN_OR_DEBUG_FATAL(...) LOG_WARN(...)
     #define LOG_ERROR_OR_DEBUG_FATAL(...) LOG_FATAL(__VA_ARGS__)
     #define LOG_ERROR_OR_DEBUG_FATAL_NO_ALLOC(...) LOG_FATAL_NO_ALLOC(__VA_ARGS__)
 #else
     #define LOG_DEBUG(...)
+    #define LOG_WARN_OR_DEBUG_FATAL(...) LOG_WARN(__VA_ARGS__)
+// #define LOG_WARN_OR_FATAL_NO_ALLOC(...) LOG_WARN(__VA_ARGS__)
     #define LOG_ERROR_OR_DEBUG_FATAL(...) LOG_ERROR(__VA_ARGS__)
     #define LOG_ERROR_OR_DEBUG_FATAL_NO_ALLOC(...) LOG_ERROR_NO_ALLOC(__VA_ARGS__)
 #endif
