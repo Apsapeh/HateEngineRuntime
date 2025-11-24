@@ -19,7 +19,7 @@ sys.path.insert(0, tools_dir)
 
 from api_generator import parser
 
-PAIRS_TEMPLATE = """
+SETGET_PAIRS_TEMPLATE = """
 typedef void (**FnT)(void);
 struct FnPair {
     const char* name;
@@ -32,17 +32,33 @@ PAIRS
 };
 """
 
+SIGNATURE_HEADER = """
+#ifndef SIGNATURE_PREFIX
+#define SIGNATURE_PREFIX static
+#endif
+
+"""
+
 
 def main(parse_result):
     for server in parse_result.servers:
         path = pathlib.Path(server.filename)
         pairs = ['{"_init", (FnT) &backend->_init}', '{"_quit", (FnT) &backend->_quit}']
+        signatures = SIGNATURE_HEADER
         for f in server.methods:
             pairs.append(f'{{"{f.name}", (FnT) &backend->{f.name}}}')
 
-        out = PAIRS_TEMPLATE.replace("PAIRS", ",\n".join(pairs))
+            args = ", ".join([f"{arg._type}" for arg in f.args])
+            if args == "":
+                args = "void"
+            signatures += f"SIGNATURE_PREFIX {f.return_type} {f.name} ({args});\n"
+
+        out = SETGET_PAIRS_TEMPLATE.replace("PAIRS", ",\n".join(pairs))
         with open(path.parent.joinpath("setget-pairs-table.h.gen"), "w") as f:
             f.write(out)
+
+        with open(path.parent.joinpath("methods-signatures.h.gen"), "w") as f:
+            f.write(signatures)
     # print(json.dumps(dict(parse_result)["servers"], indent=4))
     #
 

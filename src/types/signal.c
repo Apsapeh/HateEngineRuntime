@@ -65,12 +65,14 @@ SignalCallbackHandler signal_unsafe_connect(
     ERROR_ARGS_CHECK_2(self, func, { return 0; });
 
     // Finding empty cell in the data vector
-    const SignalCallback* const data_end_ptr = self->data.data + self->data.size;
-    for (SignalCallback* ptr = self->data.data; ptr < data_end_ptr; ++ptr) {
+    SignalCallback* const data = self->data.data;
+    const usize size = self->data.size;
+    for (usize i = 0; i < size; ++i) {
+        SignalCallback* ptr = &self->data.data[i];
         if (ptr->func == NULL) {
             ptr->func = func;
             ptr->ctx = ctx;
-            return (SignalCallbackHandler) (data_end_ptr - ptr - 1);
+            return (SignalCallbackHandler) i + 1;
         }
     }
 
@@ -83,19 +85,21 @@ SignalCallbackHandler signal_unsafe_connect(
         return 0;
     }
 
-    return self->data.size - 1;
+    return self->data.size;
 }
 
 boolean signal_unsafe_disconnect(SignalUnsafe* self, SignalCallbackHandler handler) {
     ERROR_ARGS_CHECK_2(self, handler, { return false; });
-    if (handler >= self->data.size) {
+    if (handler > self->data.size) {
         LOG_ERROR(
-                "Handler is out from index boundary. 'handler' = %u, but bonddary is %u (incl.)",
-                (unsigned int) handler, (unsigned int) (self->data.size - 1)
+                "Handler is out from index boundary. 'handler' = %u, but boundarry is %u (incl.)",
+                (unsigned int) handler, (unsigned int) (self->data.size)
         );
         set_error(ERROR_NOT_FOUND);
         return false;
     }
+
+    --handler;
 
     // SignalCallbackHandler shouldn't be changed on freing other callback
 

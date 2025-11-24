@@ -12,7 +12,7 @@ RenderContextSurface* g_surface;
 WindowServerWindow* g_win2;
 RenderContextSurface* g_surface2;
 PUBLIC void _ready(void) {
-    g_win = window_server_create_window("Hello", IVEC2_NEW_M(800, 600), NULL);
+    g_win = window_server_create_window("Hello", IVEC2_NEW_M(1280, 720), NULL);
     if (!g_win) {
         printf("СМЭРТЬ: %s\n", get_error());
         exit(1);
@@ -24,7 +24,7 @@ PUBLIC void _ready(void) {
         exit(1);
     }
 
-    g_win2 = window_server_create_window("Hello2", IVEC2_NEW_M(800, 600), NULL);
+    g_win2 = window_server_create_window("Hello2", IVEC2_NEW_M(1280, 720), NULL);
     if (!g_win2) {
         printf("СМЭРТЬ: %s\n", get_error());
         exit(1);
@@ -36,26 +36,28 @@ PUBLIC void _ready(void) {
         exit(1);
     }
     // window_server_destroy_window(win);*/
+
+
+    RenderServerWorld* world = render_server_world_create();
+
+    RenderServerViewport* viewport = render_server_viewport_surface_create(g_surface);
+    render_server_viewport_set_size(viewport, IVEC2_NEW_M(1280, 720));
+
+    RenderServerRenderTask* task = render_server_render_task_create();
+    render_server_render_task_set_world(task, world);
+    render_server_render_task_set_viewport(task, viewport);
+    // render_server_render_task_set_state(task, RENDER_SERVER_RENDER_TASK_STATE_DISABLED);
+
+    RenderServerViewport* viewport2 = render_server_viewport_surface_create(g_surface2);
+    render_server_viewport_set_size(viewport, IVEC2_NEW_M(1280, 720));
+
+    RenderServerRenderTask* task2 = render_server_render_task_create();
+    render_server_render_task_set_world(task2, world);
+    render_server_render_task_set_viewport(task2, viewport2);
 }
 
-static int g_count = 0;
-double g_time = 0;
+PUBLIC void _render(double delta) {
+}
+
 PUBLIC void _process(double delta) {
-    // printf("Process %d\n", count);
-    g_time += delta;
-    g_count++;
-
-    render_context_surface_make_current(g_surface);
-    render_server_frame_begin();
-
-    render_server_frame_end();
-    render_context_surface_present(g_surface);
-
-
-    return;
-
-    if (g_count == 20000000) {
-        printf("Exit\n");
-        exit(0);
-    }
 }

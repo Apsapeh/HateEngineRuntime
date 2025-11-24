@@ -6,8 +6,10 @@
 
 typedef void (*SetupFn)(void);
 typedef void (*ReadyFn)(void);
+typedef void (*ExitFn)(void);
 typedef void (*ProcessFn)(double);
 typedef void (*PhysicsProcessFn)(double);
+typedef void (*RenderFn)(double);
 
 typedef void (*RuntimeInitFn)(void* (*proc_addr)(const char* name));
 typedef void (*WindowServerInitFn)(WindowServerBackend* backend);
@@ -17,8 +19,10 @@ typedef void (*RenderServerIninFn)(RenderServerBackend* backend);
 typedef struct GameLoaderEnvironment {
     SetupFn _setup;
     ReadyFn _ready;
+    ExitFn _exit;
     ProcessFn _process;
     PhysicsProcessFn _physics_process;
+    RenderFn _render;
 
     // Init functions
     RuntimeInitFn _runtime_init;

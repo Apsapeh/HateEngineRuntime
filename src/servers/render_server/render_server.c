@@ -27,7 +27,7 @@ static vec_backendPair g_registredBackends;
 
 // Async buffers
 struct CommandQueue {
-    CallDefferedRenderThreadFunctionPointer function;
+    RenderServerCallDefferedFunc function;
     void* ctx;
 };
 
@@ -36,7 +36,6 @@ vector_template_impl_static(commandQueue, struct CommandQueue)
 
 static vec_commandQueue g_commandQueueArr[COMMAND_QUEUE_ARRAY_SIZE];
 static unsigned char g_currentCommandQueueIdx = 0;
-static mutex_handle g_swapQueueMutex;
 static mutex_handle g_currentQueueMutex;
 
 static boolean g_isLoaded = false;
@@ -51,11 +50,6 @@ void render_server_init(void) {
     for (usize i = 0; i < COMMAND_QUEUE_ARRAY_SIZE; ++i) {
         g_commandQueueArr[i] = vec_commandQueue_init();
         vec_commandQueue_reserve(g_commandQueueArr, COMMAND_QUEUE_DEFAULT_SIZE);
-    }
-
-    g_swapQueueMutex = mutex_new();
-    if (g_swapQueueMutex == NULL) {
-        LOG_FATAL("render_server_init: Mutex can't be created with error: %s", get_error());
     }
 
     g_currentQueueMutex = mutex_new();
@@ -75,7 +69,6 @@ void render_server_exit(void) {
         vec_commandQueue_free(&g_commandQueueArr[i]);
     }
 
-    mutex_free(g_swapQueueMutex);
     mutex_free(g_currentQueueMutex);
 
     vec_backendPair_free(&g_registredBackends);
@@ -157,7 +150,7 @@ void render_server_end_frame(void) {
 }
 
 /* ====================> RenderServer Async functions <==================== */
-boolean call_deferred_render_thread(CallDefferedRenderThreadFunctionPointer function, void* ctx) {
+boolean call_deferred_render_thread(RenderServerCallDefferedFunc function, void* ctx) {
     ERROR_ARGS_CHECK_1(function, { return false; });
 
     if (g_threadMode == RENDER_SERVER_THREAD_MODE_SYNC) {

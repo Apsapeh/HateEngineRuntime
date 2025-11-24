@@ -1,4 +1,5 @@
 #include "game_loader_environment.h"
+#include "types/types.h"
 
 #include <platform/dylib.h>
 #include <log.h>
@@ -36,15 +37,19 @@
 // clang-format off
 static void _setup_placeholder(void) {}
 static void _ready_placeholder(void) {}
+static void _exit_placeholder(void) {}
 static void _process_placeholder(double _) {}
 static void _physics_process_placeholder(double _) {}
+static void _render_placeholder(double _) {}
 // clang-format on
 
 
 c_str const static SETUP_FN = "_setup";
 c_str const static READY_FN = "_ready";
+c_str const static EXIT_FN = "_exit_";
 c_str const static PROCESS_FN = "_process";
 c_str const static PHYSICS_PROCESS_FN = "_physics_process";
+c_str const static RENDER_FN = "_render";
 
 c_str const static RUNTIME_FN_INIT = "___hate_engine_runtime_init";
 c_str const static WINDOW_SERVER_FN_INIT = "___hate_engine_runtime_init_window_server";
@@ -69,10 +74,12 @@ GameLoaderEnvironment load_environment(void) {
 
     LOAD_OR_PLACEHOLDER_WARN(result._setup, SETUP_FN, SetupFn, _setup_placeholder);
     LOAD_OR_PLACEHOLDER_WARN(result._ready, READY_FN, ReadyFn, _ready_placeholder);
+    LOAD_OR_PLACEHOLDER_WARN(result._exit, EXIT_FN, ExitFn, _exit_placeholder);
     LOAD_OR_PLACEHOLDER_WARN(result._process, PROCESS_FN, ProcessFn, _process_placeholder);
     LOAD_OR_PLACEHOLDER_WARN(
             result._physics_process, PHYSICS_PROCESS_FN, PhysicsProcessFn, _physics_process_placeholder
     );
+    LOAD_OR_PLACEHOLDER_WARN(result._render, RENDER_FN, RenderFn, _render_placeholder);
 
     return result;
 }

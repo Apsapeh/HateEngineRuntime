@@ -7,6 +7,28 @@
 #include "math/mat4.h"
 #include "math/vec4.h"
 #include "ex_alloc/chunk_allocator.h"
+#include "servers/render_context/render_context.h"
+
+
+// MACROS API START
+
+// clang-format off
+#define RENDER_SERVER_RENDER_TASK_STATE_ENABLED   0
+#define RENDER_SERVER_RENDER_TASK_STATE_DISABLED  1
+#define RENDER_SERVER_RENDER_TASK_STATE_FIRST RENDER_SERVER_RENDER_TASK_STATE_ENABLED
+#define RENDER_SERVER_RENDER_TAST_STATE_LAST  RENDER_SERVER_RENDER_TASK_STATE_DISABLED
+// clang-format on
+
+// MACROS API END
+
+/**
+ * 0 - Enabled. Task will be rendered
+ *
+ * 1 - Disabled. Task will be skipped
+ *
+ * @api
+ */
+typedef u8 RenderServerRenderTaskState;
 
 
 /*
@@ -30,7 +52,7 @@ API ENUM {
 // clang-format on
 
 /**
- * 0 - Buffer will be setted once and naver changed.
+ * 0 - Buffer will be set once and never changed.
  *     Use for static meshes like level, level environment, etc.
  *
  * 1 - Buffer will be sometimes change
@@ -60,8 +82,8 @@ API ENUM {
 #define RENDER_SERVER_BUFFER_TYPE_VERTEX 0
 #define RENDER_SERVER_BUFFER_TYPE_INDEX 1
 #define RENDER_SERVER_BUFFER_TYPE_NORMAL 2
-#define RENDER_SERVER_BUFFER_TYPE_FIRST RENDER_SERVER_BUFFER_USAGE_HINT_VERTEX
-#define RENDER_SERVER_BUFFER_TYPE_LAST RENDER_SERVER_BUFFER_USAGE_HINT_NORMAL
+#define RENDER_SERVER_BUFFER_TYPE_FIRST RENDER_SERVER_BUFFER_TYPE_VERTEX
+#define RENDER_SERVER_BUFFER_TYPE_LAST RENDER_SERVER_BUFFER_TYPE_NORMAL
 // clang-format on
 
 /**
@@ -153,11 +175,22 @@ API ENUM {
  */
 typedef u8 RenderServerDataOwnMode;
 
+/**
+ * @api
+ */
+typedef struct RenderServerRenderTask RenderServerRenderTask;
 
 /**
  * @api
  */
-typedef chunk_allocator_ptr RenderServerWorldHandle;
+typedef struct RenderServerViewport RenderServerViewport;
+// typedef chunk_allocator_ptr RenderServerViewportHandle;
+
+/**
+ * @api
+ */
+typedef struct RenderServerWorld RenderServerWorld;
+// typedef chunk_allocator_ptr RenderServerWorldHandle;
 
 /**
  * @api
@@ -202,8 +235,21 @@ typedef struct {
     // SignalCallbackHandler (*signal_connect)(c_str name, SignalCallbackFunc func, void* ctx);
     // boolean (*signal_disconnect)(c_str name, SignalCallbackHandler);
 
-    boolean (*frame_begin)(void);
-    boolean (*frame_end)(void);
+    boolean (*_draw)(double delta);
+
+    RenderServerRenderTask* (*render_task_create)(void);
+    boolean (*render_task_set_world)(RenderServerRenderTask* task, RenderServerWorld* world);
+    boolean (*render_task_set_viewport)(RenderServerRenderTask* tast, RenderServerViewport* viewport);
+    boolean (*render_task_set_state)(RenderServerRenderTask* task, RenderServerRenderTaskState state);
+    boolean (*render_task_set_priority)(RenderServerRenderTask* task, i32 priority);
+    boolean (*render_task_destroy)(RenderServerRenderTask* task);
+
+
+    RenderServerViewport* (*viewport_surface_create)(RenderContextSurface* surface);
+    // RenderServerViewport* (*viewport_texture_create)
+    boolean (*viewport_set_position)(RenderServerViewport* viewport, IVec2 pos);
+    boolean (*viewport_set_size)(RenderServerViewport* viewport, IVec2 size);
+    boolean (*viewport_destroy)(RenderServerViewport* viewport);
 
     // Environment
     // RID (*environment_create)(void);
@@ -212,17 +258,18 @@ typedef struct {
     //
 
     // World (contains all data to draw)
-    RenderServerWorldHandle (*world_create)(void);
-    boolean (*world_add_instace)(RenderServerWorldHandle world, RenderServerInstanceHandle instance);
-    boolean (*world_del_instace)(RenderServerWorldHandle world, RenderServerInstanceHandle instance);
-    boolean (*world_set_ambient_color)(RenderServerWorldHandle world, Vec4 color);
-    boolean (*world_destroy)(RenderServerWorldHandle world);
+    RenderServerWorld* (*world_create)(void);
+    boolean (*world_add_instance)(RenderServerWorld* world, RenderServerInstanceHandle instance);
+    boolean (*world_del_instance)(RenderServerWorld* world, RenderServerInstanceHandle instance);
+    boolean (*world_set_ambient_color)(RenderServerWorld* world, Vec4 color);
+    boolean (*world_draw)(RenderServerWorld* world, RenderServerViewport* viewport);
+    boolean (*world_destroy)(RenderServerWorld* world);
 
     // Instance (contains mesh, material, transform)
     RenderServerInstanceHandle (*instance_create)(void);
     boolean (*instance_set_mesh)(RenderServerInstanceHandle instance, RenderServerMeshHandle mesh);
     boolean (*instance_set_material)(
-            RenderServerInstanceHandle instance, RenderServerMeshHandle material
+            RenderServerInstanceHandle instance, RenderServerMaterialHandle material
     );
     boolean (*instance_set_transform)(RenderServerInstanceHandle instance, Mat4 trasform);
     boolean (*instance_destroy)(RenderServerInstanceHandle instance);
@@ -240,11 +287,12 @@ typedef struct {
     boolean (*mesh_destroy)(RenderServerMeshHandle ptr);
 
     // Buffer
-    RenderServerBufferHandle (*buffer_create)(void);
+    RenderServerBufferHandle (*buffer_create)(
+            RenderServerBufferType type, RenderServerBufferUsageHint usage_hint
+    );
     boolean (*buffer_set_data)(
             RenderServerBufferHandle ptr, const void* data, u64 data_size_in_bytes,
-            RenderServerDataType data_type, RenderServerDataOwnMode data_own_mode,
-            RenderServerBufferUsageHint usage_hint
+            RenderServerDataType data_type, RenderServerDataOwnMode data_own_mode
     );
     boolean (*buffer_destroy)(RenderServerBufferHandle ptr);
 
@@ -266,7 +314,7 @@ typedef struct {
 } RenderServerBackend;
 
 
-// API START
+// MACROS API START
 
 // clang-format off
 #define RENDER_SERVER_THREAD_MODE_SYNC   0
@@ -275,7 +323,7 @@ typedef struct {
 #define RENDER_SERVER_THREAD_MODE_LAST  RENDER_SERVER_THREDA_MODE_ASYNC
 // clang-format on
 
-// API END
+// MACROS API END
 
 /**
  * 0 - Rendering and game logic runs in one thread
@@ -330,17 +378,20 @@ boolean render_server_is_loaded(void);
 RenderServerThreadMode render_server_get_thread_mode(void);
 
 
+/* ====================> Frame pipeline functions <==================== */
+void render_server_begin_frame(void);
+
+void render_server_end_frame(void);
+
+
 /* ====================> RenderServer Async functions <==================== */
 /**
  * @brief Deffered Function template
  *
  * @api
  */
-typedef void (*CallDefferedRenderThreadFunctionPointer)(void* ctx);
+typedef void (*RenderServerCallDefferedFunc)(void* ctx);
 
-void render_server_begin_frame(void);
-
-void render_server_end_frame(void);
 
 /**
  * @brief Call some function in the begin of next iteration of the render thread
@@ -371,7 +422,7 @@ void render_server_end_frame(void);
  *
  * @api
  */
-boolean call_deferred_render_thread(CallDefferedRenderThreadFunctionPointer function, void* ctx);
+boolean call_deferred_render_thread(RenderServerCallDefferedFunc function, void* ctx);
 
 
 /* ====================> RenderServerBackend functions <==================== */
