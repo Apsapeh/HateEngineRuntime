@@ -58,8 +58,12 @@ struct RenderServerViewport {
 
 
 /* ==================================  World ================================= */
+
+vector_template_def_static(instanceHandle, RenderServerInstanceHandle);
+vector_template_impl_static(instanceHandle, RenderServerInstanceHandle);
+
 struct RenderServerWorld {
-    int tmp;
+    vec_instanceHandle instances; // TODO: change to hash map
 };
 
 
@@ -77,7 +81,7 @@ struct Mesh {
 
 struct Buffer {
     void* ptr;
-    //    u64 size;
+    u64 size;
     RenderServerBufferType buffer_type; // Vertex, Index, Normal, etc.
     RenderServerDataType data_type; // Float, Int, etc.
     RenderServerDataOwnMode own_mode; // Copy, Borrow, Ptr
@@ -170,10 +174,47 @@ static boolean _draw(double delta) {
             if (task->viewport->type == ViewportTypeSurface) {
                 RenderContext.surface_make_current(task->viewport->data.surface.surface);
             }
+
+            RenderServerViewport* viewport = task->viewport;
+
+            glViewport(viewport->pos.x, viewport->pos.y, viewport->size.x, viewport->size.y);
+
+
+            glEnable(GL_DEPTH_TEST);
+
+            glEnableClientState(GL_VERTEX_ARRAY);
+            glEnableClientState(GL_COLOR_ARRAY);
+
             // render
             glClearColor(1.0f, 0.0f, 0.0, 0.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+            const usize instances_size = task->world->instances.size;
+            RenderServerInstanceHandle* const instances = task->world->instances.data;
+            for (usize i = 0; i < instances_size; ++i) {
+                struct Instance* const instance =
+                        chunk_memory_allocator_get_real_ptr(&g_instances, instances[i]);
+
+                struct Mesh* const mesh = chunk_memory_allocator_get_real_ptr(&g_meshes, instance->mesh);
+                struct Buffer* const vbo =
+                        chunk_memory_allocator_get_real_ptr(&g_buffers, mesh->vertices_buf);
+                struct Buffer* const ebo =
+                        chunk_memory_allocator_get_real_ptr(&g_buffers, mesh->indices_buf);
+
+                glPushMatrix();
+
+                glMultMatrixf((GLfloat*) &instance->transform.m);
+
+                glColorPointer(3, GL_FLOAT, 0, vbo->ptr);
+                glVertexPointer(3, GL_FLOAT, 0, vbo->ptr);
+                glDrawElements(GL_TRIANGLES, ebo->size / 4, GL_UNSIGNED_INT, ebo->ptr);
+
+                glPopMatrix();
+            }
+
+            glDisableClientState(GL_VERTEX_ARRAY);
+            glDisableClientState(GL_COLOR_ARRAY);
+            glDisable(GL_DEPTH_TEST);
 
             if (task->viewport->type == ViewportTypeSurface) {
                 RenderContext.surface_present(task->viewport->data.surface.surface);
@@ -275,11 +316,14 @@ static boolean viewport_destroy(RenderServerViewport* viewport) {
 static RenderServerWorld* world_create(void) {
     RenderServerWorld* world = tmalloc(sizeof(RenderServerWorld));
     ERROR_ALLOC_CHECK(world, { return false; });
+    world->instances = vec_instanceHandle_init();
     return world;
 }
 
 static boolean world_add_instance(RenderServerWorld* world, RenderServerInstanceHandle instance) {
-    return false;
+    ERROR_ARGS_CHECK_2(world, instance, { return false; });
+    vec_instanceHandle_push_back(&world->instances, instance);
+    return true;
 }
 
 static boolean world_del_instance(RenderServerWorld* world, RenderServerInstanceHandle instance) {
@@ -296,6 +340,7 @@ static boolean world_draw(RenderServerWorld* world, RenderServerViewport* viewpo
 
 static boolean world_destroy(RenderServerWorld* world) {
     ERROR_ARGS_CHECK_1(world, { return false; });
+    vec_instanceHandle_free(&world->instances);
     tfree(world);
     return false;
 }
@@ -388,7 +433,7 @@ static boolean mesh_set_indices_buffer(RenderServerMeshHandle hdl, RenderServerB
     if (!ptr)
         return false;
 
-    ptr->vertices_buf = buffer;
+    ptr->indices_buf = buffer;
 
     return true;
 }
@@ -419,6 +464,7 @@ static RenderServerBufferHandle buffer_create(
     RenderServerBufferHandle h = chunk_memory_allocator_alloc_mem(&g_buffers, (void**) &ptr);
     if (h) {
         ptr->ptr = NULL;
+        ptr->size = 0;
         ptr->own_mode = RENDER_SERVER_DATA_OWN_MODE_PTR;
         ptr->buffer_type = type;
     }
@@ -481,6 +527,7 @@ static boolean buffer_set_data(
 
     ptr->data_type = data_type;
     ptr->own_mode = data_own_mode;
+    ptr->size = data_size;
     return true;
 }
 
