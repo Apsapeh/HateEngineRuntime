@@ -53,7 +53,7 @@ GameFunctions load_game(void) {
     return game_functions;
 }
 
-#include <api_sym_lookup_table.h>
+#include <api_sym_lookup_table.h.gen>
 void* runtime_proc_loader(const char* name) {
     for (usize i = 0; i < sizeof(g_apiFunctionLookupTable) / sizeof(g_apiFunctionLookupTable[0]); i++) {
         if (strcmp(g_apiFunctionLookupTable[i].name, name) == 0) {
@@ -63,7 +63,6 @@ void* runtime_proc_loader(const char* name) {
     return NULL;
 }
 
-#include <api_sym_lookup_table.h>
 void* _runtime_proc_loader(const char* name) {
     usize left = 0;
     usize right = sizeof(g_apiFunctionLookupTable) / sizeof(g_apiFunctionLookupTable[0]) - 1;
