@@ -4,7 +4,9 @@
 #include <types/types.h>
 #include <types/signal.h>
 #include "math/ivec2.h"
+#include "math/mat3.h"
 #include "math/mat4.h"
+#include "math/vec3.h"
 #include "math/vec4.h"
 #include "ex_alloc/chunk_allocator.h"
 #include "servers/render_context/render_context.h"
@@ -189,6 +191,11 @@ typedef struct RenderServerViewport RenderServerViewport;
 /**
  * @api
  */
+typedef struct RenderServerCamera RenderServerCamera;
+
+/**
+ * @api
+ */
 typedef struct RenderServerWorld RenderServerWorld;
 // typedef chunk_allocator_ptr RenderServerWorldHandle;
 
@@ -240,6 +247,7 @@ typedef struct {
     RenderServerRenderTask* (*render_task_create)(void);
     boolean (*render_task_set_world)(RenderServerRenderTask* task, RenderServerWorld* world);
     boolean (*render_task_set_viewport)(RenderServerRenderTask* tast, RenderServerViewport* viewport);
+    boolean (*render_task_set_camera)(RenderServerRenderTask* task, RenderServerCamera* camera);
     boolean (*render_task_set_state)(RenderServerRenderTask* task, RenderServerRenderTaskState state);
     boolean (*render_task_set_priority)(RenderServerRenderTask* task, i32 priority);
     boolean (*render_task_destroy)(RenderServerRenderTask* task);
@@ -247,9 +255,22 @@ typedef struct {
 
     RenderServerViewport* (*viewport_surface_create)(RenderContextSurface* surface);
     // RenderServerViewport* (*viewport_texture_create)
-    boolean (*viewport_set_position)(RenderServerViewport* viewport, IVec2 pos);
-    boolean (*viewport_set_size)(RenderServerViewport* viewport, IVec2 size);
+    boolean (*viewport_set_position)(RenderServerViewport* viewport, const IVec2* const pos);
+    boolean (*viewport_set_size)(RenderServerViewport* viewport, const IVec2* const size);
     boolean (*viewport_destroy)(RenderServerViewport* viewport);
+
+    // Матрица вида
+    //      уснановить нормальную матрицу
+    //      пересчитать матрицу по нормальной матрице вращения и по нормальной позиции
+    //
+    // Матрица проекции
+    //      установить напрямую
+    //      пересчитать проекцию по параметрам
+    //      пересчитать ортогональную проекцию по параметрам
+    RenderServerCamera* (*camera_create)(void);
+    boolean (*camera_projection_set)(RenderServerCamera* camera, const Mat4* const matrix);
+    boolean (*camera_view_set)(RenderServerCamera* camera, const Mat4* const matrix);
+    boolean (*camera_destroy)(RenderServerCamera* camera);
 
     // Environment
     // RID (*environment_create)(void);
@@ -261,8 +282,7 @@ typedef struct {
     RenderServerWorld* (*world_create)(void);
     boolean (*world_add_instance)(RenderServerWorld* world, RenderServerInstanceHandle instance);
     boolean (*world_del_instance)(RenderServerWorld* world, RenderServerInstanceHandle instance);
-    boolean (*world_set_ambient_color)(RenderServerWorld* world, Vec4 color);
-    boolean (*world_draw)(RenderServerWorld* world, RenderServerViewport* viewport);
+    boolean (*world_set_ambient_color)(RenderServerWorld* world, const Vec4* const color);
     boolean (*world_destroy)(RenderServerWorld* world);
 
     // Instance (contains mesh, material, transform)
@@ -271,7 +291,7 @@ typedef struct {
     boolean (*instance_set_material)(
             RenderServerInstanceHandle instance, RenderServerMaterialHandle material
     );
-    boolean (*instance_set_transform)(RenderServerInstanceHandle instance, Mat4 trasform);
+    boolean (*instance_set_transform)(RenderServerInstanceHandle instance, const Mat4* const trasform);
     boolean (*instance_destroy)(RenderServerInstanceHandle instance);
 
     // Mesh

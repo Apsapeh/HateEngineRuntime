@@ -157,6 +157,8 @@ boolean signal_constructor(Signal* self) {
 boolean signal_destructor(Signal* self) {
     ERROR_ARGS_CHECK_1(self, { return false; });
     signal_unsafe_destructor(&self->unsafe);
+    // WARN: Mutex may be locked like while it's emitting or some other shit with locking. I have no
+    // ideas how to avoid this problem
     mutex_free(self->mutex);
     return true;
 }

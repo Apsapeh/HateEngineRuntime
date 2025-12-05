@@ -37,6 +37,7 @@ typedef void* ptr;
 #define U16_MAX UINT16_MAX
 #define U32_MAX UINT32_MAX
 #define U64_MAX UINT64_MAX
+#define USIZE_MAX SIZE_MAX
 
 
 #define I8_MAX INT8_MAX

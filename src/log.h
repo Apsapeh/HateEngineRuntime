@@ -26,14 +26,15 @@ typedef struct {
 log_full_trace_info log_full_trace_get_info(void);
 
 
+#define LOG_FATAL_NO_ALLOC(...) __he_log_fatal_no_alloc(__LINE__, __FILE__, __VA_ARGS__);
+#define LOG_ERROR_NO_ALLOC(...) __he_log_error_no_alloc(__LINE__, __FILE__, __VA_ARGS__);
+
+// MACROS API BEGIN
+
 #define LOG_INFO(...) __he_log_info(__LINE__, __FILE__, __VA_ARGS__)
 #define LOG_WARN(...) __he_log_warning(__LINE__, __FILE__, __VA_ARGS__);
 #define LOG_ERROR(...) __he_log_error(__LINE__, __FILE__, __VA_ARGS__);
 #define LOG_FATAL(...) __he_log_fatal(__LINE__, __FILE__, __VA_ARGS__);
-
-#define LOG_FATAL_NO_ALLOC(...) __he_log_fatal_no_alloc(__LINE__, __FILE__, __VA_ARGS__);
-#define LOG_ERROR_NO_ALLOC(...) __he_log_error_no_alloc(__LINE__, __FILE__, __VA_ARGS__);
-
 
 #ifdef HE_DEBUG
     #define LOG_DEBUG(...) __he_log_debug(__LINE__, __FILE__, __VA_ARGS__);
@@ -48,14 +49,41 @@ log_full_trace_info log_full_trace_get_info(void);
     #define LOG_ERROR_OR_DEBUG_FATAL_NO_ALLOC(...) LOG_ERROR_NO_ALLOC(__VA_ARGS__)
 #endif
 
+// MACROS API END
+
+/**
+ * @brief Inner function for logging in INFO mode. Don't use it directly
+ *
+ * @api
+ */
 void __he_log_info(i32 line, const char* file, const char* fmt, ...);
 
+/**
+ * @brief Inner function for logging in WARN mode. Don't use it directly
+ *
+ * @api
+ */
 void __he_log_warning(i32 line, const char* file, const char* fmt, ...);
 
+/**
+ * @brief Inner function for logging in FATAL mode. Don't use it directly
+ *
+ * @api
+ */
 void __he_log_fatal(i32 line, const char* file, const char* fmt, ...);
 
+/**
+ * @brief Inner function for logging in ERROR mode. Don't use it directly
+ *
+ * @api
+ */
 void __he_log_error(i32 line, const char* file, const char* fmt, ...);
 
+/**
+ * @brief Inner function for logging in DEBUG mode. Don't use it directly
+ *
+ * @api
+ */
 void __he_log_debug(i32 line, const char* file, const char* fmt, ...);
 
 

@@ -27,17 +27,27 @@
 #define BUFFERS_CHUNK_SIZE 512
 #define BUFFERS_CHUNKS_COUNT 4
 
+#ifdef HE_DEBUG
+    #define CMA_PTR(cma, hdl) chunk_memory_allocator_get_real_ptr(cma, hdl);
+#else
+    #define CMA_PTR(cma, hdl) chunk_memory_allocator_get_real_ptr_unsafe(cma, hdl);
+#endif
+
 
 /* ================================ Render Task ============================== */
 struct RenderServerRenderTask {
     RenderServerWorld* world;
     RenderServerViewport* viewport;
+    RenderServerCamera* camera;
     RenderServerRenderTaskState state;
     i32 priority;
 };
 
 static vec_ptr g_renderTaskPtrs;
-static boolean g_renderTasksNeedToSort = false;
+static boolean g_renderTaskPtrsNeedToSort = false;
+
+static vec_ptr g_renderTaskUniqueSurfaces;
+static boolean g_renderTaskUniqueSurfacesNeedToRebuild = false;
 
 
 /* ================================= Viewport ================================ */
@@ -56,11 +66,17 @@ struct RenderServerViewport {
     } data;
 };
 
+/* ================================= Viewport ================================ */
+struct RenderServerCamera {
+    Mat4 view;
+    Mat4 projection;
+};
+
 
 /* ==================================  World ================================= */
 
-vector_template_def_static(instanceHandle, RenderServerInstanceHandle);
-vector_template_impl_static(instanceHandle, RenderServerInstanceHandle);
+vector_template_def_static(instanceHandle, usize); // RenderServerInstanceHandle
+vector_template_impl_static(instanceHandle, usize); //   RenderServerInstanceHandle
 
 struct RenderServerWorld {
     vec_instanceHandle instances; // TODO: change to hash map
@@ -69,14 +85,14 @@ struct RenderServerWorld {
 
 /* ============================== Inner Structs ============================== */
 struct Instance {
-    RenderServerMeshHandle mesh;
-    RenderServerMaterialHandle material;
+    usize mesh; // RenderServerMeshHandle
+    usize material; // RenderServerMaterialHandle
     Mat4 transform;
 };
 
 struct Mesh {
-    RenderServerBufferHandle vertices_buf;
-    RenderServerBufferHandle indices_buf;
+    usize vertices_buf; // RenderServerBufferHandle
+    usize indices_buf; // RenderServerBufferHandle
 };
 
 struct Buffer {
@@ -122,6 +138,7 @@ static boolean _init(void) {
     }
 
     g_renderTaskPtrs = vec_ptr_init();
+    g_renderTaskUniqueSurfaces = vec_ptr_init();
 
     INIT_SUBSYSTEM_VARS(g_instances, struct Instance, INSTANCES_CHUNK_SIZE, INSTANCES_CHUNKS_COUNT);
     INIT_SUBSYSTEM_VARS(g_meshes, struct Mesh, MESHES_CHUNK_SIZE, MESHES_CHUNKS_COUNT);
@@ -134,6 +151,7 @@ static boolean _init(void) {
 
 static boolean _quit(void) {
     vec_ptr_free(&g_renderTaskPtrs);
+    vec_ptr_free(&g_renderTaskUniqueSurfaces);
 
     QUIT_SUBSYSTEM_VARS(g_instances);
     QUIT_SUBSYSTEM_VARS(g_meshes);
@@ -143,8 +161,24 @@ static boolean _quit(void) {
 }
 
 static int task_comp(const void* a, const void* b) {
-    i32 arg1 = ((const RenderServerRenderTask*) a)->priority;
-    i32 arg2 = ((const RenderServerRenderTask*) b)->priority;
+    const RenderServerRenderTask* task_a = *((const RenderServerRenderTask**) a);
+    const RenderServerRenderTask* task_b = *((const RenderServerRenderTask**) b);
+
+    i32 arg1 = task_a->priority;
+    i32 arg2 = task_b->priority;
+
+    usize major1 = USIZE_MAX;
+    usize major2 = USIZE_MAX;
+
+    if (task_a->viewport != NULL && task_a->viewport->type == ViewportTypeSurface)
+        major1 = (usize) task_a->viewport->data.surface.surface;
+    if (task_b->viewport != NULL && task_b->viewport->type == ViewportTypeSurface)
+        major2 = (usize) task_b->viewport->data.surface.surface;
+
+    if (major1 < major2)
+        return -1;
+    if (major1 > major2)
+        return 1;
 
     if (arg1 < arg2)
         return -1;
@@ -153,6 +187,7 @@ static int task_comp(const void* a, const void* b) {
     return 0;
 }
 
+
 static boolean _draw(double delta) {
     if (!g_gladLoaded)
         return false;
@@ -160,27 +195,54 @@ static boolean _draw(double delta) {
     const usize vec_size = g_renderTaskPtrs.size;
     struct RenderServerRenderTask** data = (struct RenderServerRenderTask**) g_renderTaskPtrs.data;
 
-
-    if (g_renderTasksNeedToSort) {
+    if (g_renderTaskPtrsNeedToSort) {
         qsort(data, vec_size, sizeof(struct RenderServerRenderTask*), task_comp);
-        g_renderTasksNeedToSort = false;
+        g_renderTaskPtrsNeedToSort = false;
     }
 
+    if (g_renderTaskUniqueSurfacesNeedToRebuild) {
+        vec_ptr_clear(&g_renderTaskUniqueSurfaces);
+        // O(n^2), but there is fine, because it's very rare operation (in most cases, when creating a
+        // task) Also, I guess it will be fastest solution on small amounts (which they are)
+        for (usize i = 0; i < vec_size; ++i) {
+            struct RenderServerRenderTask* task = data[i];
+
+            if (task->viewport == NULL || task->viewport->type != ViewportTypeSurface)
+                continue;
+
+            usize j = 0;
+            for (; j < i; ++j) {
+                struct RenderServerRenderTask* task_exist = data[j];
+                if (task_exist->viewport == NULL || task_exist->viewport->type != ViewportTypeSurface)
+                    continue;
+                if (task->viewport->data.surface.surface == task_exist->viewport->data.surface.surface)
+                    break;
+            }
+
+            if (i == j)
+                vec_ptr_push_back(&g_renderTaskUniqueSurfaces, task->viewport->data.surface.surface);
+        }
+        g_renderTaskUniqueSurfacesNeedToRebuild = false;
+    }
 
     for (usize i = 0; i < vec_size; ++i) {
         struct RenderServerRenderTask* task = data[i];
-
-        if (task->state == RENDER_SERVER_RENDER_TASK_STATE_ENABLED && task->viewport && task->world) {
+        if (task->state == RENDER_SERVER_RENDER_TASK_STATE_ENABLED && task->viewport && task->world &&
+            task->camera) {
             if (task->viewport->type == ViewportTypeSurface) {
                 RenderContext.surface_make_current(task->viewport->data.surface.surface);
             }
 
             RenderServerViewport* viewport = task->viewport;
+            RenderServerCamera* camera = task->camera;
 
             glViewport(viewport->pos.x, viewport->pos.y, viewport->size.x, viewport->size.y);
 
 
             glEnable(GL_DEPTH_TEST);
+            glEnable(GL_SCISSOR_TEST);
+
+            glScissor(viewport->pos.x, viewport->pos.y, viewport->size.x, viewport->size.y);
 
             glEnableClientState(GL_VERTEX_ARRAY);
             glEnableClientState(GL_COLOR_ARRAY);
@@ -189,21 +251,28 @@ static boolean _draw(double delta) {
             glClearColor(1.0f, 0.0f, 0.0, 0.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            const usize instances_size = task->world->instances.size;
-            RenderServerInstanceHandle* const instances = task->world->instances.data;
-            for (usize i = 0; i < instances_size; ++i) {
-                struct Instance* const instance =
-                        chunk_memory_allocator_get_real_ptr(&g_instances, instances[i]);
+            // float proj[16] = {0.9747, 0, 0, 0, 0, 1.7321, 0, 0, 0, 0, -1.0002, -1, 0, 0, -0.2000, 0};
 
-                struct Mesh* const mesh = chunk_memory_allocator_get_real_ptr(&g_meshes, instance->mesh);
-                struct Buffer* const vbo =
-                        chunk_memory_allocator_get_real_ptr(&g_buffers, mesh->vertices_buf);
-                struct Buffer* const ebo =
-                        chunk_memory_allocator_get_real_ptr(&g_buffers, mesh->indices_buf);
+            glMatrixMode(GL_PROJECTION);
+            glLoadMatrixf((GLfloat*) &camera->projection);
+            //            glLoadMatrixf(proj);
+
+
+            glMatrixMode(GL_MODELVIEW);
+            glLoadMatrixf((GLfloat*) &camera->view);
+            const usize instances_size = task->world->instances.size;
+            usize* const instances = task->world->instances.data;
+            for (usize i = 0; i < instances_size; ++i) {
+                struct Instance* const instance = CMA_PTR(&g_instances, instances[i]);
+
+                struct Mesh* const mesh = CMA_PTR(&g_meshes, instance->mesh);
+                struct Buffer* const vbo = CMA_PTR(&g_buffers, mesh->vertices_buf);
+                struct Buffer* const ebo = CMA_PTR(&g_buffers, mesh->indices_buf);
 
                 glPushMatrix();
 
                 glMultMatrixf((GLfloat*) &instance->transform.m);
+                // glMultMatrixf(t);
 
                 glColorPointer(3, GL_FLOAT, 0, vbo->ptr);
                 glVertexPointer(3, GL_FLOAT, 0, vbo->ptr);
@@ -215,11 +284,19 @@ static boolean _draw(double delta) {
             glDisableClientState(GL_VERTEX_ARRAY);
             glDisableClientState(GL_COLOR_ARRAY);
             glDisable(GL_DEPTH_TEST);
+            glDisable(GL_SCISSOR_TEST);
 
             if (task->viewport->type == ViewportTypeSurface) {
-                RenderContext.surface_present(task->viewport->data.surface.surface);
+                // RenderContext.surface_present(task->viewport->data.surface.surface);
             }
         }
+    }
+
+    const usize surfaces_size = g_renderTaskUniqueSurfaces.size;
+    struct RenderContextSurface** const s_data =
+            (struct RenderContextSurface**) g_renderTaskUniqueSurfaces.data;
+    for (usize i = 0; i < surfaces_size; ++i) {
+        RenderContext.surface_present(s_data[i]);
     }
 
     return true;
@@ -231,16 +308,18 @@ static RenderServerRenderTask* render_task_create(void) {
     ERROR_ALLOC_CHECK(task, { return NULL; });
     task->viewport = NULL;
     task->world = NULL;
+    task->camera = NULL;
     task->state = RENDER_SERVER_RENDER_TASK_STATE_ENABLED;
     task->priority = 0;
 
     unsigned char status = vec_ptr_push_back(&g_renderTaskPtrs, task);
     if (!status) {
         tfree(task);
-        LOG_ERROR_OR_DEBUG_FATAL("oentuhs");
+        set_error(ERROR_ALLOCATION_FAILED);
+        LOG_ERROR_OR_DEBUG_FATAL("RenderServer(OpenGL 1.3)::render_task_create");
         return NULL;
     }
-    g_renderTasksNeedToSort = true;
+    g_renderTaskPtrsNeedToSort = true;
     return task;
 }
 
@@ -253,8 +332,16 @@ static boolean render_task_set_world(RenderServerRenderTask* task, RenderServerW
 static boolean render_task_set_viewport(RenderServerRenderTask* task, RenderServerViewport* viewport) {
     ERROR_ARGS_CHECK_2(task, viewport, { return false; });
     task->viewport = viewport;
+    g_renderTaskUniqueSurfacesNeedToRebuild = true;
     return true;
 }
+
+static boolean render_task_set_camera(RenderServerRenderTask* task, RenderServerCamera* camera) {
+    ERROR_ARGS_CHECK_2(task, camera, { return false; });
+    task->camera = camera;
+    return true;
+}
+
 
 static boolean render_task_set_state(RenderServerRenderTask* task, RenderServerRenderTaskState state) {
     ERROR_ARGS_CHECK_2(task, state, { return false; });
@@ -265,6 +352,7 @@ static boolean render_task_set_state(RenderServerRenderTask* task, RenderServerR
 static boolean render_task_set_priority(RenderServerRenderTask* task, i32 priority) {
     ERROR_ARGS_CHECK_1(task, { return false; });
     task->priority = priority;
+    g_renderTaskPtrsNeedToSort = true;
     return true;
 }
 
@@ -277,7 +365,8 @@ static boolean render_task_destroy(RenderServerRenderTask* task) {
     for (usize i = 0; i < vec_size; ++i) {
         if (data[i] == task) {
             vec_ptr_erase(&g_renderTaskPtrs, i);
-            g_renderTasksNeedToSort = true;
+            g_renderTaskPtrsNeedToSort = true;
+            g_renderTaskUniqueSurfacesNeedToRebuild = true;
         }
     }
     return true;
@@ -294,15 +383,15 @@ static RenderServerViewport* viewport_surface_create(RenderContextSurface* surfa
     return viewport;
 }
 
-static boolean viewport_set_position(RenderServerViewport* viewport, IVec2 pos) {
-    ERROR_ARGS_CHECK_1(viewport, { return false; });
-    viewport->pos = pos;
+static boolean viewport_set_position(RenderServerViewport* viewport, const IVec2* const pos) {
+    ERROR_ARGS_CHECK_2(viewport, pos, { return false; });
+    viewport->pos = *pos;
     return true;
 }
 
-static boolean viewport_set_size(RenderServerViewport* viewport, IVec2 size) {
-    ERROR_ARGS_CHECK_1(viewport, { return false; });
-    viewport->size = size;
+static boolean viewport_set_size(RenderServerViewport* viewport, const IVec2* const size) {
+    ERROR_ARGS_CHECK_2(viewport, size, { return false; });
+    viewport->size = *size;
     return true;
 }
 
@@ -312,6 +401,45 @@ static boolean viewport_destroy(RenderServerViewport* viewport) {
     return false;
 }
 
+
+static RenderServerCamera* camera_create(void) {
+    RenderServerCamera* camera = tmalloc(sizeof(RenderServerCamera));
+    ERROR_ALLOC_CHECK(camera, { return false; });
+    camera->view = MAT4_ONE_M;
+    camera->projection = MAT4_ONE_M;
+    return camera;
+}
+
+static boolean camera_projection_set(RenderServerCamera* camera, const Mat4* const m) {
+    ERROR_ARGS_CHECK_2(camera, m, { return false; });
+    camera->projection = *m;
+    return true;
+}
+
+static boolean camera_view_set(RenderServerCamera* camera, const Mat4* const m) {
+    ERROR_ARGS_CHECK_2(camera, m, { return false; });
+
+    Mat4 view = MAT4_ONE_M;
+    // Transpose rotation matrix, [0][0]..[2][2]
+    // This is calculate an inverse matrix, because the world is moving, not a camera
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            view.m[i][j] = m->m[j][i];
+        }
+    }
+
+    // Translate Rotation matrix with inversed coords
+    mat4_translate_in(&view, -m->m[3][0], -m->m[3][1], -m->m[3][2]);
+
+    camera->view = view;
+    return true;
+}
+
+static boolean camera_destroy(RenderServerCamera* camera) {
+    ERROR_ARGS_CHECK_1(camera, { return false; });
+    tfree(camera);
+    return true;
+}
 
 static RenderServerWorld* world_create(void) {
     RenderServerWorld* world = tmalloc(sizeof(RenderServerWorld));
@@ -330,11 +458,7 @@ static boolean world_del_instance(RenderServerWorld* world, RenderServerInstance
     return false;
 }
 
-static boolean world_set_ambient_color(RenderServerWorld* world, Vec4 color) {
-    return false;
-}
-
-static boolean world_draw(RenderServerWorld* world, RenderServerViewport* viewport) {
+static boolean world_set_ambient_color(RenderServerWorld* world, const Vec4* const color) {
     return false;
 }
 
@@ -361,7 +485,7 @@ static RenderServerInstanceHandle instance_create(void) {
     struct Instance* ptr = chunk_memory_allocator_get_real_ptr(&g_instances, instance);                 \
     if (!ptr) {                                                                                         \
         LOG_ERROR_OR_DEBUG_FATAL(                                                                       \
-                "RenderServer(OpenGL 1.3)::" #fn_name ": Instance with this handle (%u) not found",     \
+                "RenderServer(OpenGL 1.3)::" fn_name ": Instance with this handle (%u) not found",      \
                 instance                                                                                \
         );                                                                                              \
         set_error(ERROR_NOT_FOUND);                                                                     \
@@ -388,11 +512,11 @@ static boolean instance_set_material(
     return true;
 }
 
-static boolean instance_set_transform(RenderServerInstanceHandle instance, Mat4 transform) {
+static boolean instance_set_transform(RenderServerInstanceHandle instance, const Mat4* const transform) {
     ERROR_ARGS_CHECK_1(instance, { return false; });
 
     INSTANCE_GET_PTR("instance_set_mesh")
-    ptr->transform = transform;
+    ptr->transform = *transform;
 
     return true;
 }
@@ -499,7 +623,7 @@ static boolean buffer_set_data(
     if (data_own_mode == RENDER_SERVER_DATA_OWN_MODE_COPY) {
         void* new_data_ptr;
         if (ptr->own_mode == RENDER_SERVER_DATA_OWN_MODE_PTR)
-            new_data_ptr = malloc(data_size);
+            new_data_ptr = tmalloc(data_size);
         else
             new_data_ptr = trealloc(ptr->ptr, data_size);
         ERROR_ALLOC_CHECK(new_data_ptr, { return false; });
@@ -507,7 +631,7 @@ static boolean buffer_set_data(
 
         ptr->ptr = new_data_ptr;
     } else if (data_own_mode == RENDER_SERVER_DATA_OWN_MODE_BORROW) {
-        // Yes, cast const void* -> void*. But this data is borowed
+        // Yes, cast (const void*) to (void*). But this data is borowed
         ptr->ptr = (void*) data;
     } else if (data_own_mode == RENDER_SERVER_DATA_OWN_MODE_PTR) {
         ptr->ptr = (void*) data;
@@ -562,7 +686,9 @@ void render_server_opengl_13_backend_register(void) {
     REGISTER(render_task_create);
     REGISTER(render_task_set_world);
     REGISTER(render_task_set_viewport);
+    REGISTER(render_task_set_camera);
     REGISTER(render_task_set_state);
+    REGISTER(render_task_set_priority);
     REGISTER(render_task_destroy);
 
     REGISTER(viewport_surface_create);
@@ -570,11 +696,15 @@ void render_server_opengl_13_backend_register(void) {
     REGISTER(viewport_set_size);
     REGISTER(viewport_destroy);
 
+    REGISTER(camera_create);
+    REGISTER(camera_projection_set);
+    REGISTER(camera_view_set);
+    REGISTER(camera_destroy);
+
     REGISTER(world_create);
     REGISTER(world_add_instance);
     REGISTER(world_del_instance);
     REGISTER(world_set_ambient_color);
-    REGISTER(world_draw);
     REGISTER(world_destroy);
 
     REGISTER(instance_create);

@@ -186,8 +186,10 @@ chunk_allocator_ptr chunk_memory_allocator_alloc_mem(ChunkMemoryAllocator* this,
 /**
  * @api
  */
-boolean chunk_memory_allocator_free_mem(ChunkMemoryAllocator* this, chunk_allocator_ptr ptr) {
-    ERROR_ARGS_CHECK_2(this, ptr, );
+boolean chunk_memory_allocator_free_mem(ChunkMemoryAllocator* this, chunk_allocator_ptr ptr_u64) {
+    ERROR_ARGS_CHECK_2(this, ptr_u64, );
+
+    usize ptr = (usize) ptr_u64;
 
     --ptr;
     if (ptr >= this->chunk_element_count * this->chunks.size) {
@@ -250,8 +252,10 @@ boolean chunk_memory_allocator_free_mem(ChunkMemoryAllocator* this, chunk_alloca
  *
  * @api
  */
-void* chunk_memory_allocator_get_real_ptr(ChunkMemoryAllocator* this, chunk_allocator_ptr ptr) {
-    ERROR_ARGS_CHECK_2(this, ptr, { return NULL; });
+void* chunk_memory_allocator_get_real_ptr(ChunkMemoryAllocator* this, chunk_allocator_ptr ptr_u64) {
+    ERROR_ARGS_CHECK_2(this, ptr_u64, { return NULL; });
+
+    usize ptr = (u32) ptr_u64;
 
     --ptr;
 
@@ -272,4 +276,15 @@ void* chunk_memory_allocator_get_real_ptr(ChunkMemoryAllocator* this, chunk_allo
         return (char*) this->chunks.data[chunk_index] + element_in_chunk * this->element_size;
     }
     return NULL;
+}
+
+void* chunk_memory_allocator_get_real_ptr_unsafe(
+        ChunkMemoryAllocator* this, chunk_allocator_ptr ptr_u64
+) {
+    ERROR_ARGS_CHECK_2(this, ptr_u64, { return false; });
+    usize ptr = (u32) ptr_u64;
+    --ptr;
+    const usize chunk_index = ptr / this->chunk_element_count;
+    const usize element_in_chunk = ptr % this->chunk_element_count;
+    return (char*) this->chunks.data[chunk_index] + element_in_chunk * this->element_size;
 }

@@ -160,16 +160,31 @@ def run(data: ParseResult):
             fn_ptrs_decl += f"{function.doc}\n"
             norm_fn_ptrs_decl += f"{function.doc}\n"
 
-        args = ", ".join(
-            [general.get_correct_variable(arg._type, arg.name) for arg in function.args]
-        )
+        corr_args = [
+            general.get_correct_variable(arg._type, arg.name) for arg in function.args
+        ]
+
+        if function.is_variadic:
+            corr_args.append("...")
+
+        args = ", ".join(corr_args)
         if args == "":
             args = "void"
 
+        is_inner_function = function.name in (
+            "get_error",
+            "set_error",
+        ) or function.name.startswith("__")
+
         function_name = "raw_" + function.name
+        if is_inner_function:
+            function_name = function.name
         fn_ptrs_decl += f"extern {function.return_type} (*{function_name})({args});\n\n"
         fn_ptrs_impl += f"    {function.return_type} (*{function_name})({args});\n"
-        cast_args = ", ".join([f"{arg._type}" for arg in function.args])
+        cast_args_arr = [f"{arg._type}" for arg in function.args]
+        if function.is_variadic:
+            cast_args_arr.append("...")
+        cast_args = ", ".join(cast_args_arr)
         if cast_args == "":
             cast_args = "void"
         fn_ptrs_load += f'        {function_name} = ({function.return_type} (*)({cast_args}))proc_addr("{function.name}");\n'
@@ -180,7 +195,7 @@ def run(data: ParseResult):
         norm_fn_ptrs_impl += f"    {function.return_type} (*{function.name})({args});\n"
         norm_fn_ptrs_load += f"            {function.name} = {function_name};\n"
 
-        if function.name == "__he_update_full_trace_info":
+        if is_inner_function:
             continue
 
         trace_impl += full_trace_impl_generator(
@@ -303,9 +318,7 @@ def full_trace_impl_generator(return_type, name, args) -> str:
         if arg != args[-1]:
             functions += ", "
     functions += ") {\n"
-    functions += (
-        f'    raw___he_update_full_trace_info("{name}", ___file___, ___line___);\n'
-    )
+    functions += f'    __he_update_full_trace_info("{name}", ___file___, ___line___);\n'
     func_call = f"raw_{name}({', '.join([f'{arg.name}' for arg in args])});"
     if return_type == "void":
         functions += f"    {func_call}\n"
@@ -314,7 +327,7 @@ def full_trace_impl_generator(return_type, name, args) -> str:
             f"    {general.get_correct_variable(return_type, 'result')} = {func_call}\n"
         )
 
-    functions += '    raw___he_update_full_trace_info("", "", -1);\n'
+    functions += '    __he_update_full_trace_info("", "", -1);\n'
 
     if return_type != "void":
         functions += f"    return result;\n"
@@ -393,4 +406,3 @@ def camel_to_upper_snake_case(name):
         result.append(current_char)
 
     return "".join(result).upper()
-
