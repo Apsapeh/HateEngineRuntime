@@ -47,7 +47,7 @@ c_str const static PROCESS_FN = "_process";
 c_str const static PHYSICS_PROCESS_FN = "_physics_process";
 
 c_str const static RUNTIME_FN_INIT = "___hate_engine_runtime_init";
-c_str const static WINDOW_SERVER_FN_INIT = "___hate_engine_runtime_init_window_server";
+c_str const static PLATFORM_DRIVER_FN_INIT = "___hate_engine_runtime_init_platform_driver";
 c_str const static RENDER_CONTEXT_FN_INIT = "___hate_engine_runtime_init_render_context";
 c_str const static RENDER_SERVER_FN_INIT = "___hate_engine_runtime_init_render_server";
 
@@ -63,7 +63,7 @@ GameLoaderEnvironment load_environment(void) {
     }
 
     LOAD_WITH_CHECK_FATAL(result._runtime_init, RUNTIME_FN_INIT, RuntimeInitFn);
-    LOAD_WITH_CHECK_FATAL(result._window_server_init, WINDOW_SERVER_FN_INIT, WindowServerInitFn);
+    LOAD_WITH_CHECK_FATAL(result._platform_driver_init, PLATFORM_DRIVER_FN_INIT, PlatformDriverInitFn);
     LOAD_WITH_CHECK_FATAL(result._render_context_init, RENDER_CONTEXT_FN_INIT, RenderContextInitFn);
     LOAD_WITH_CHECK_FATAL(result._render_server_init, RENDER_SERVER_FN_INIT, RenderServerIninFn);
 
