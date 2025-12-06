@@ -4,7 +4,7 @@
 #include <types/types.h>
 #include <types/signal.h>
 
-#include <servers/window_server/window_server.h>
+#include <servers/platform_driver/platform_driver.h>
 
 /**
  * @brief

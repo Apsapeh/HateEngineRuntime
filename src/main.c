@@ -11,7 +11,7 @@
 #include "servers/render_server/render_server.h"
 #include "types/uid.h"
 #include "vfs/vfs.h"
-#include "servers/window_server/window_server.h"
+#include "servers/platform_driver/platform_driver.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>

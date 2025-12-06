@@ -1,10 +1,10 @@
-#include "window_server_sdl3.h"
+#include "platform_driver_sdl3.h"
 #include "SDL3/SDL_init.h"
 #include "SDL3/SDL_video.h"
 #include "error.h"
 #include "log.h"
 #include "math/ivec2.h"
-#include "servers/window_server/window_server.h"
+#include "servers/platform_driver/platform_driver.h"
 #include "types/types.h"
 #include "helpers.h"
 

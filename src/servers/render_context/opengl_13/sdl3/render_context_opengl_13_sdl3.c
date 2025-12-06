@@ -7,8 +7,8 @@
 #include "SDL3/SDL_video.h"
 
 #include "servers/render_context/render_context.h"
-#include "servers/window_server/sdl3/window_server_sdl3.h"
-#include "servers/window_server/window_server.h"
+#include "servers/platform_driver/sdl3/platform_driver_sdl3.h"
+#include "servers/platform_driver/platform_driver.h"
 #include "types/signal.h"
 #include "types/types.h"
 
