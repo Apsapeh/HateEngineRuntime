@@ -44,11 +44,13 @@ PUBLIC void _ready(void) {
         exit(1);
     }
 
+
     g_surface = render_context_create_surface(g_win);
     if (!g_surface) {
         printf("СМЭРТЬ: %s\n", get_error());
         exit(1);
     }
+
 
     g_win2 = window_server_create_window("Hello2", IVEC2_NEW_M(800, 600), NULL);
     if (!g_win2) {
@@ -104,12 +106,12 @@ PUBLIC void _process(double delta) {
     g_count++;
 
     // if (count % 1000 == 0) {
-    window_server_window_set_size(g_win, IVEC2_NEW_M(800 + 100 * sin(g_time), 600));
-    window_server_window_set_size(g_win2, IVEC2_NEW_M(800, 600 + 75 * cos(g_time)));
+    //    window_server_window_set_size(g_win, IVEC2_NEW_M(800 + 100 * sin(g_time), 600));
+    //  window_server_window_set_size(g_win2, IVEC2_NEW_M(800, 600 + 75 * cos(g_time)));
     // x}
 
-    render_context_surface_present(g_surface);
-    render_context_surface_present(g_surface2);
+    // render_context_surface_present(g_surface);
+    //     render_context_surface_present(g_surface2);
 
     return;
 
