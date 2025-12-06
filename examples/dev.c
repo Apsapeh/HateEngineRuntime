@@ -6,10 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-WindowServerWindow* g_win;
+PlatformDriverWindow* g_win;
 RenderContextSurface* g_surface;
 
-WindowServerWindow* g_win2;
+PlatformDriverWindow* g_win2;
 RenderContextSurface* g_surface2;
 PUBLIC void _ready(void) {
     vfs_mount_rfs("/");
@@ -36,9 +36,9 @@ PUBLIC void _ready(void) {
     string_free(str_hello_world_hand);
     */
 
-    printf("wscw: %p\n", (void*) raw_window_server_create_window);
-    printf("wswss: %p\n", (void*) raw_window_server_window_set_size);
-    g_win = window_server_create_window("Hello", IVEC2_NEW_M(800, 600), NULL);
+    printf("wscw: %p\n", (void*) raw_platform_driver_create_window);
+    printf("wswss: %p\n", (void*) raw_platform_driver_window_set_size);
+    g_win = platform_driver_create_window("Hello", IVEC2_NEW_M(800, 600), NULL);
     if (!g_win) {
         printf("СМЭРТЬ: %s\n", get_error());
         exit(1);
@@ -50,7 +50,7 @@ PUBLIC void _ready(void) {
         exit(1);
     }
 
-    g_win2 = window_server_create_window("Hello2", IVEC2_NEW_M(800, 600), NULL);
+    g_win2 = platform_driver_create_window("Hello2", IVEC2_NEW_M(800, 600), NULL);
     if (!g_win2) {
         printf("СМЭРТЬ: %s\n", get_error());
         exit(1);
@@ -104,8 +104,8 @@ PUBLIC void _process(double delta) {
     g_count++;
 
     // if (count % 1000 == 0) {
-    window_server_window_set_size(g_win, IVEC2_NEW_M(800 + 100 * sin(g_time), 600));
-    window_server_window_set_size(g_win2, IVEC2_NEW_M(800, 600 + 75 * cos(g_time)));
+    platform_driver_window_set_size(g_win, IVEC2_NEW_M(800 + 100 * sin(g_time), 600));
+    platform_driver_window_set_size(g_win2, IVEC2_NEW_M(800, 600 + 75 * cos(g_time)));
     // x}
 
     render_context_surface_present(g_surface);
