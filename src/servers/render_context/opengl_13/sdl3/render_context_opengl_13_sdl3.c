@@ -141,7 +141,7 @@ static i32 get_available_signals(c_str* names_buff, c_str* descriptions_buff) {
 
 
 static SDL_GLContext g_openglSharedContext = NULL;
-static RenderContextSurface* create_surface(WindowServerWindow* window) {
+static RenderContextSurface* create_surface(PlatformDriverWindow* window) {
     ERROR_ARGS_CHECK_1(window, { return NULL; });
     MAIN_THREAD_CHECK(create_surface, { return NULL; });
 

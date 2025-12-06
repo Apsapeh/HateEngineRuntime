@@ -30,7 +30,7 @@ typedef struct {
     i32 (*get_available_signals)(c_str* names_buff, c_str* descriptions_buff);
 
 
-    RenderContextSurface* (*create_surface)(WindowServerWindow* window);
+    RenderContextSurface* (*create_surface)(PlatformDriverWindow* window);
     boolean (*destroy_surface)(RenderContextSurface* surface);
 
     boolean (*surface_make_current)(RenderContextSurface* surface);
@@ -40,7 +40,7 @@ typedef struct {
 } RenderContextBackend;
 
 
-// Static global WindowServer
+// Static global PlatformDriver
 extern RenderContextBackend RenderContext;
 
 /**
@@ -52,34 +52,34 @@ void render_context_exit(void);
 
 /**
  * @brief Register a backend
- * @return "InvalidArgument" if render_server_name is NULL or window_server_name is NULL or backend is
+ * @return "InvalidArgument" if render_server_name is NULL or platform_driver_name is NULL or backend is
  * NULL
- * @return "AlreadyExists" if a backend with the same render_server_name and window_server_name is
+ * @return "AlreadyExists" if a backend with the same render_server_name and platform_driver_name is
  * already registered
  *
  * @api
  */
 boolean render_context_register_backend(
-        const char* render_server_name, const char* window_server_name, RenderContextBackend* backend
+        const char* render_server_name, const char* platform_driver_name, RenderContextBackend* backend
 );
 
 /**
  * @brief Load a backend. First you should register them via render_context_register_backend
  * @warning If the backend is already loaded, this function does nothing.
- * @return "InvalidArgument" if render_server_name is NULL or window_server_name
+ * @return "InvalidArgument" if render_server_name is NULL or platform_driver_name
  * @return "NotFound" if a backend with the given names is not registered
  * @return "InvalidState" if the backend is already loaded
  *
  * @api
  */
-boolean render_context_load_backend(const char* render_server_name, const char* window_server_name);
+boolean render_context_load_backend(const char* render_server_name, const char* platform_driver_name);
 
 /**
  * @brief If backend was loaded
  */
 boolean render_context_is_loaded(void);
 
-/* ====================> WindowServerBackend functions <==================== */
+/* ====================> RenderContextBackend functions <==================== */
 
 /**
  * @brief Create a new RenderContextBackend instance

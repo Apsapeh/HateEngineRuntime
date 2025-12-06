@@ -12,7 +12,7 @@ RenderContextBackend RenderContext;
 
 struct BackendPair {
     const char* render_server_name;
-    const char* window_server_name;
+    const char* platform_driver_name;
     RenderContextBackend* backend;
 };
 
@@ -41,16 +41,16 @@ void render_context_exit(void) {
 }
 
 boolean render_context_register_backend(
-        const char* render_server_name, const char* window_server_name, RenderContextBackend* backend
+        const char* render_server_name, const char* platform_driver_name, RenderContextBackend* backend
 ) {
-    ERROR_ARGS_CHECK_3(render_server_name, window_server_name, backend, { return false; });
+    ERROR_ARGS_CHECK_3(render_server_name, platform_driver_name, backend, { return false; });
 
     for (usize i = 0; i < g_registredBackends.size; i++) {
         if (strcmp(g_registredBackends.data[i].render_server_name, render_server_name) == 0 &&
-            strcmp(g_registredBackends.data[i].window_server_name, window_server_name) == 0) {
+            strcmp(g_registredBackends.data[i].platform_driver_name, platform_driver_name) == 0) {
             LOG_ERROR(
-                    "Backend with RenderServer = '%s' and WindowServer = '%s' already registered",
-                    render_server_name, window_server_name
+                    "Backend with RenderServer = '%s' and PlatformDriver = '%s' already registered",
+                    render_server_name, platform_driver_name
             );
             set_error(ERROR_ALREADY_EXISTS);
             return false;
@@ -58,14 +58,15 @@ boolean render_context_register_backend(
     }
 
     vec_backendPair_push_back(
-            &g_registredBackends, (struct BackendPair) {render_server_name, window_server_name, backend}
+            &g_registredBackends,
+            (struct BackendPair) {render_server_name, platform_driver_name, backend}
     );
 
     return true;
 }
 
-boolean render_context_load_backend(const char* render_server_name, const char* window_server_name) {
-    ERROR_ARGS_CHECK_2(render_server_name, window_server_name, { return false; });
+boolean render_context_load_backend(const char* render_server_name, const char* platform_driver_name) {
+    ERROR_ARGS_CHECK_2(render_server_name, platform_driver_name, { return false; });
 
     if (g_isLoaded) {
         LOG_ERROR("(render_context_load_backend) RenderContext already loaded");
@@ -75,7 +76,7 @@ boolean render_context_load_backend(const char* render_server_name, const char* 
 
     for (usize i = 0; i < g_registredBackends.size; i++) {
         if (strcmp(g_registredBackends.data[i].render_server_name, render_server_name) == 0 &&
-            strcmp(g_registredBackends.data[i].window_server_name, window_server_name) == 0) {
+            strcmp(g_registredBackends.data[i].platform_driver_name, platform_driver_name) == 0) {
 
             RenderContext = *g_registredBackends.data[i].backend;
             g_isLoaded = true;

@@ -10,7 +10,7 @@ typedef void (*ProcessFn)(double);
 typedef void (*PhysicsProcessFn)(double);
 
 typedef void (*RuntimeInitFn)(void* (*proc_addr)(const char* name));
-typedef void (*WindowServerInitFn)(WindowServerBackend* backend);
+typedef void (*PlatformDriverInitFn)(PlatformDriverBackend* backend);
 typedef void (*RenderContextInitFn)(RenderContextBackend* backend);
 typedef void (*RenderServerIninFn)(RenderServerBackend* backend);
 
@@ -22,7 +22,7 @@ typedef struct GameLoaderEnvironment {
 
     // Init functions
     RuntimeInitFn _runtime_init;
-    WindowServerInitFn _window_server_init;
+    PlatformDriverInitFn _platform_driver_init;
     RenderContextInitFn _render_context_init;
     RenderServerIninFn _render_server_init;
 } GameLoaderEnvironment;
