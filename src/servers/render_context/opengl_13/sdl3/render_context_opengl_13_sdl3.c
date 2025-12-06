@@ -193,6 +193,7 @@ static boolean surface_make_current(RenderContextSurface* surface) {
     return true;
 }
 
+#include <stdio.h>
 
 static boolean surface_present(RenderContextSurface* surface) {
     ERROR_ARG_CHECK(surface, { return false; });
@@ -202,11 +203,19 @@ static boolean surface_present(RenderContextSurface* surface) {
         if (!surface_make_current(surface))
             return false;
     }
+    // SDL_GL_SwapWindow((SDL_Window*) surface);
     if (!SDL_GL_SwapWindow((SDL_Window*) surface)) {
-        LOG_FATAL(
-                "RenderContext.surface_present: Failed to swap window's buffers. SDL Error: %s",
-                SDL_GetError()
-        );
+        const char* er = SDL_GetError();
+        // const char* ier = er;
+        // for (; *ier; ++ier) {
+        //     char c = *ier;
+        //     LOG_INFO("%d", (int) c);
+        // }
+        // FILE* fp = fopen("data.txt", "w");
+        // fprintf(fp, "%s", er);
+        // fclose(fp);
+
+        LOG_FATAL("RenderContext.surface_present: Failed to swap window's buffers. SDL Error: %s", er);
         set_error(ANY_ERROR);
         return false;
     }
