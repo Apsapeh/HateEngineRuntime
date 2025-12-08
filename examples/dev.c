@@ -109,7 +109,7 @@ PUBLIC void _process(double delta) {
     platform_driver_window_set_size(g_win2, IVEC2_NEW_M(800, 600 + 75 * cos(g_time)));
     // x}
 
-    // render_context_surface_present(g_surface);
+    render_context_surface_present(g_surface);
     //     render_context_surface_present(g_surface2);
 
     return;

@@ -2,14 +2,10 @@
 #include <platform/memory.h>
 #include <error.h>
 #include <helpers.h>
-
-struct InputEvent {
-    InputEventType type;
-
-    struct {
-        boolean is_pressed;
-    } key;
-};
+#include "input/key.h"
+#include "input/mouse.h"
+#include "log.h"
+#include "math/vec2.h"
 
 #ifdef HE_DEBUG
     #define EVENT_TYPE_CHECK(event, event_type, function_name, end_block)                               \
@@ -28,30 +24,53 @@ struct InputEvent {
 #endif
 
 
+boolean input_event_constructor(InputEvent* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    self->type = INPUT_EVENT_TYPE_UNKNOWN;
+    return true;
+}
+
+boolean input_event_destructor(InputEvent* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    return true;
+}
+
+
 InputEvent* input_event_new(void) {
     InputEvent* result = tmalloc(sizeof(InputEvent));
     ERROR_ALLOC_CHECK(result, { return NULL; });
-    result->type = INPUT_EVENT_TYPE_UNKNOWN;
+    input_event_constructor(result);
     return result;
 }
 
 boolean input_event_free(InputEvent* event) {
     ERROR_ARGS_CHECK_1(event, { return false; });
+    input_event_destructor(event);
     tfree(event);
     return true;
 }
 
 boolean input_event_set_type(InputEvent* event, InputEventType type) {
     ERROR_ARGS_CHECK_1(event, { return false; });
-    if (type < INPUT_EVENT_TYPE_FIRST || type > INPUT_EVENT_TYPE_LAST) {
-        LOG_ERROR_OR_DEBUG_FATAL("input_event_set_type: Unknown 'type' - %d", type);
-        set_error(ERROR_INVALID_ARGUMENT);
-        return false;
-    }
-    event->type = type;
+    ERROR_RANGE_CHECK(type, INPUT_EVENT_TYPE_FIRST, INPUT_EVENT_TYPE_LAST, { return false; });
 
-    if (type == INPUT_EVENT_TYPE_KEY) {
-        event->key.is_pressed = false;
+    event->type = type;
+    switch (type) {
+        case INPUT_EVENT_TYPE_KEY:
+            event->data.key.key = KEY_UNKNOWN;
+            event->data.key.is_pressed = false;
+            event->data.key.is_repeat = false;
+            break;
+        case INPUT_EVENT_TYPE_MOUSE_BUTTON:
+            event->data.mouse_button.button = MOUSE_BUTTON_UNKNOWN;
+            event->data.mouse_button.is_pressed = false;
+            event->data.mouse_button.clicks = 0;
+            event->data.mouse_button.coords = VEC2_ZERO_M;
+            break;
+        case INPUT_EVENT_TYPE_MOUSE_MOTION:
+            event->data.mouse_motion.offset = VEC2_ZERO_M;
+            event->data.mouse_motion.coords = VEC2_ZERO_M;
+            break;
     }
 
     return true;
@@ -66,32 +85,186 @@ boolean input_event_emit(const InputEvent* event) {
     ERROR_ARGS_CHECK_1(event, { return false; });
 
     if (event->type == INPUT_EVENT_TYPE_KEY) {
-        LOG_INFO("IsPressed: %b", event->key.is_pressed);
+        LOG_INFO(
+                "Key: %d, IsPressed: %b, IsRepeat: %d", event->data.key.key, event->data.key.is_pressed,
+                event->data.key.is_repeat
+        );
+    } else if (event->type == INPUT_EVENT_TYPE_MOUSE_BUTTON) {
+        LOG_INFO(
+                "MouseButton: %d, IsPressed: %d, Clicks: %d, X: %f, Y: %f",
+                event->data.mouse_button.button, event->data.mouse_button.is_pressed,
+                event->data.mouse_button.clicks, event->data.mouse_button.coords.x,
+                event->data.mouse_button.coords.y
+        );
+    } else if (event->type == INPUT_EVENT_TYPE_MOUSE_MOTION) {
+        LOG_INFO(
+                "OffsetX: %f, OffsetY: %f, CoordX: %f, CoordY: %f", event->data.mouse_motion.offset.x,
+                event->data.mouse_motion.offset.y, event->data.mouse_motion.coords.x,
+                event->data.mouse_motion.coords.y
+        );
     }
 
     return true;
 }
 
 
-/* ====================================> Mouse Motion Event <====================================*/
+/* ====================================> Key Event <====================================*/
+boolean input_event_key_set_key(InputEvent* event, Key key) {
+    ERROR_ARGS_CHECK_1(event, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_KEY, "input_event_key_set_is_pressed", { return false; });
+    // TODO: Add key range check
+    event->data.key.key = key;
+    return true;
+}
+
 boolean input_event_key_set_is_pressed(InputEvent* event, boolean is_pressed) {
     ERROR_ARGS_CHECK_1(event, { return false; });
     EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_KEY, "input_event_key_set_is_pressed", { return false; });
-    event->key.is_pressed = is_pressed;
+    event->data.key.is_pressed = is_pressed;
+    return true;
+}
+
+boolean input_event_key_set_is_repeat(InputEvent* event, boolean is_repeat) {
+    ERROR_ARGS_CHECK_1(event, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_KEY, "input_event_key_set_is_repeat", { return false; });
+    event->data.key.is_repeat = is_repeat;
+    return true;
+}
+
+boolean input_event_key_get_key(InputEvent* event, Key* out) {
+    ERROR_ARGS_CHECK_2(event, out, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_KEY, "input_event_key_is_pressed", { return false; });
+
+    *out = event->data.key.key;
+    return true;
+}
+
+boolean input_event_key_is_pressed(InputEvent* event, boolean* out) {
+    ERROR_ARGS_CHECK_2(event, out, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_KEY, "input_event_key_is_pressed", { return false; });
+
+    *out = event->data.key.is_pressed;
+    return true;
+}
+
+boolean input_event_key_is_repeat(InputEvent* event, boolean* out) {
+    ERROR_ARGS_CHECK_2(event, out, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_KEY, "input_event_key_is_repeat", { return false; });
+
+    *out = event->data.key.is_repeat;
+    return true;
+}
+
+/* ====================================> Mouse Button Event <====================================*/
+boolean input_event_mouse_button_set_button(InputEvent* event, MouseButton button) {
+    ERROR_ARGS_CHECK_1(event, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_BUTTON, "input_event_mouse_button_set_button", {
+        return false;
+    });
+    ERROR_RANGE_CHECK(button, MOUSE_BUTTON_FIRST, MOUSE_BUTTON_LAST, { return false; });
+
+    event->data.mouse_button.button = button;
+    return true;
+}
+
+boolean input_event_mouse_button_set_is_pressed(InputEvent* event, boolean is_pressed) {
+    ERROR_ARGS_CHECK_1(event, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_BUTTON, "input_event_mouse_button_set_is_pressed", {
+        return false;
+    });
+    event->data.mouse_button.is_pressed = is_pressed;
+    return true;
+}
+
+boolean input_event_mouse_button_set_clicks(InputEvent* event, u8 clicks) {
+    ERROR_ARGS_CHECK_1(event, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_BUTTON, "input_event_mouse_button_set_clicks", {
+        return false;
+    });
+    event->data.mouse_button.clicks = clicks;
+    return true;
+}
+
+boolean input_event_mouse_button_set_coords(InputEvent* event, const Vec2* const coords) {
+    ERROR_ARGS_CHECK_2(event, coords, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_BUTTON, "input_event_mouse_button_set_coords", {
+        return false;
+    });
+    event->data.mouse_button.coords = *coords;
     return true;
 }
 
 
-boolean input_event_key_is_pressed(InputEvent* event, boolean* success) {
-    ERROR_ARGS_CHECK_1(event, {
-        H_SET_SUCCESS_FALSE;
+boolean input_event_mouse_button_get_button(InputEvent* event, MouseButton* out) {
+    ERROR_ARGS_CHECK_2(event, out, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_BUTTON, "input_event_mouse_button_get_button", {
         return false;
     });
-    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_KEY, "input_event_key_is_pressed", {
-        H_SET_SUCCESS_FALSE;
-        return false;
-    });
+    *out = event->data.mouse_button.button;
+    return true;
+}
 
-    H_SET_SUCCESS_TRUE;
-    return event->key.is_pressed;
+boolean input_event_mouse_button_is_pressed(InputEvent* event, boolean* out) {
+    ERROR_ARGS_CHECK_2(event, out, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_BUTTON, "input_event_mouse_button_is_pressed", {
+        return false;
+    });
+    *out = event->data.mouse_button.is_pressed;
+    return true;
+}
+
+boolean input_event_mouse_button_get_clicks(InputEvent* event, u8* out) {
+    ERROR_ARGS_CHECK_2(event, out, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_BUTTON, "input_event_mouse_button_get_clicks", {
+        return false;
+    });
+    *out = event->data.mouse_button.clicks;
+    return true;
+}
+
+boolean input_event_mouse_button_get_coords(InputEvent* event, Vec2* out) {
+    ERROR_ARGS_CHECK_2(event, out, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_BUTTON, "input_event_mouse_button_get_coords", {
+        return false;
+    });
+    *out = event->data.mouse_button.coords;
+    return true;
+}
+
+
+/* ====================================> Mouse Motion Event <====================================*/
+boolean input_event_mouse_motion_set_offset(InputEvent* event, const Vec2* const offset) {
+    ERROR_ARGS_CHECK_2(event, offset, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_MOTION, "input_event_mouse_motion_set_coords", {
+        return false;
+    });
+    event->data.mouse_motion.offset = *offset;
+    return true;
+}
+
+boolean input_event_mouse_motion_set_coords(InputEvent* event, const Vec2* const coords) {
+    ERROR_ARGS_CHECK_2(event, coords, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_MOTION, "input_event_mouse_motion_set_coords", {
+        return false;
+    });
+    event->data.mouse_motion.coords = *coords;
+    return true;
+}
+
+boolean input_event_mouse_motion_get_offset(InputEvent* event, Vec2* out) {
+    ERROR_ARGS_CHECK_2(event, out, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_MOTION, "input_event_mouse_moition_get_coords", {
+        return false;
+    });
+    *out = event->data.mouse_motion.offset;
+    return true;
+}
+
+boolean input_event_mouse_motion_get_coords(InputEvent* event, Vec2* out) {
+    ERROR_ARGS_CHECK_2(event, out, { return false; });
+    EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_MOTION, "input_event_mouse_moition_get_coords", {
+        return false;
+    });
+    *out = event->data.mouse_motion.coords;
+    return true;
 }

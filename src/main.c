@@ -34,7 +34,6 @@ int main(int argc, char* argv[]) {
     GameFunctions game_functions = load_game();
     game_functions._ready();
 
-    SDL_Event event;
     InputEvent* input_event = input_event_new();
     u64 prev_time = SDL_GetTicksNS();
     u32 frame_counter = 0;
@@ -52,18 +51,10 @@ int main(int argc, char* argv[]) {
             time_counter = 0;
         }
 
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
-                return 0;
-            }
+        if (!PlatformDriver._poll_events()) {
+            break;
+        }
 
-
-            if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
-                input_event_set_type(input_event, INPUT_EVENT_TYPE_KEY);
-                input_event_key_set_is_pressed(input_event, event.key.down);
-                input_event_emit(input_event);
-            }
-        };
         game_functions._process(0.166);
         // SDL_DelayNS(16660000);
     }
@@ -87,6 +78,10 @@ static void init(void) {
 }
 
 static void exit_init(void) {
+    RenderServer._quit();
+    RenderContext._quit();
+    PlatformDriver._quit();
+
     render_server_exit();
     render_context_exit();
     platform_driver_exit();
