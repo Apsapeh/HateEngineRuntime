@@ -46,10 +46,6 @@ struct RenderServerRenderTask {
 static vec_ptr g_renderTaskPtrs;
 static boolean g_renderTaskPtrsNeedToSort = false;
 
-static vec_ptr g_renderTaskUniqueSurfaces;
-static boolean g_renderTaskUniqueSurfacesNeedToRebuild = false;
-
-
 /* ================================= Viewport ================================ */
 enum ViewportType {
     ViewportTypeSurface = 0,
@@ -138,7 +134,6 @@ static boolean _init(void) {
     }
 
     g_renderTaskPtrs = vec_ptr_init();
-    g_renderTaskUniqueSurfaces = vec_ptr_init();
 
     INIT_SUBSYSTEM_VARS(g_instances, struct Instance, INSTANCES_CHUNK_SIZE, INSTANCES_CHUNKS_COUNT);
     INIT_SUBSYSTEM_VARS(g_meshes, struct Mesh, MESHES_CHUNK_SIZE, MESHES_CHUNKS_COUNT);
@@ -151,7 +146,6 @@ static boolean _init(void) {
 
 static boolean _quit(void) {
     vec_ptr_free(&g_renderTaskPtrs);
-    vec_ptr_free(&g_renderTaskUniqueSurfaces);
 
     QUIT_SUBSYSTEM_VARS(g_instances);
     QUIT_SUBSYSTEM_VARS(g_meshes);
@@ -200,36 +194,19 @@ static boolean _draw(double delta) {
         g_renderTaskPtrsNeedToSort = false;
     }
 
-    if (g_renderTaskUniqueSurfacesNeedToRebuild) {
-        vec_ptr_clear(&g_renderTaskUniqueSurfaces);
-        // O(n^2), but there is fine, because it's very rare operation (in most cases, when creating a
-        // task) Also, I guess it will be fastest solution on small amounts (which they are)
-        for (usize i = 0; i < vec_size; ++i) {
-            struct RenderServerRenderTask* task = data[i];
 
-            if (task->viewport == NULL || task->viewport->type != ViewportTypeSurface)
-                continue;
-
-            usize j = 0;
-            for (; j < i; ++j) {
-                struct RenderServerRenderTask* task_exist = data[j];
-                if (task_exist->viewport == NULL || task_exist->viewport->type != ViewportTypeSurface)
-                    continue;
-                if (task->viewport->data.surface.surface == task_exist->viewport->data.surface.surface)
-                    break;
-            }
-
-            if (i == j)
-                vec_ptr_push_back(&g_renderTaskUniqueSurfaces, task->viewport->data.surface.surface);
-        }
-        g_renderTaskUniqueSurfacesNeedToRebuild = false;
-    }
-
+    RenderContextSurface* current_surface = NULL;
     for (usize i = 0; i < vec_size; ++i) {
         struct RenderServerRenderTask* task = data[i];
         if (task->state == RENDER_SERVER_RENDER_TASK_STATE_ENABLED && task->viewport && task->world &&
             task->camera) {
-            if (task->viewport->type == ViewportTypeSurface) {
+            if (task->viewport->data.surface.surface != current_surface &&
+                task->viewport->type == ViewportTypeSurface) {
+                if (current_surface != NULL) {
+                    RenderContext.surface_present(current_surface);
+                }
+
+                current_surface = task->viewport->data.surface.surface;
                 RenderContext.surface_make_current(task->viewport->data.surface.surface);
             }
 
@@ -292,11 +269,8 @@ static boolean _draw(double delta) {
         }
     }
 
-    const usize surfaces_size = g_renderTaskUniqueSurfaces.size;
-    struct RenderContextSurface** const s_data =
-            (struct RenderContextSurface**) g_renderTaskUniqueSurfaces.data;
-    for (usize i = 0; i < surfaces_size; ++i) {
-        RenderContext.surface_present(s_data[i]);
+    if (current_surface != NULL) {
+        RenderContext.surface_present(current_surface);
     }
 
     return true;
@@ -332,7 +306,6 @@ static boolean render_task_set_world(RenderServerRenderTask* task, RenderServerW
 static boolean render_task_set_viewport(RenderServerRenderTask* task, RenderServerViewport* viewport) {
     ERROR_ARGS_CHECK_2(task, viewport, { return false; });
     task->viewport = viewport;
-    g_renderTaskUniqueSurfacesNeedToRebuild = true;
     return true;
 }
 
@@ -366,7 +339,6 @@ static boolean render_task_destroy(RenderServerRenderTask* task) {
         if (data[i] == task) {
             vec_ptr_erase(&g_renderTaskPtrs, i);
             g_renderTaskPtrsNeedToSort = true;
-            g_renderTaskUniqueSurfacesNeedToRebuild = true;
         }
     }
     return true;
@@ -612,7 +584,7 @@ static boolean buffer_set_data(
     }
 
     // In OpenGL 1.x you don't have any GPU buffers, all data stored in the RAM.
-    // All data you should to send to the GPU immediatly in an each frame
+    // You must send all your data to the GPU immediatly at an each frame
 
     struct Buffer* ptr = chunk_memory_allocator_get_real_ptr(&g_buffers, hdl);
     if (!ptr)

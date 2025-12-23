@@ -65,7 +65,7 @@ PUBLIC void _ready(void) {
     render_server_render_task_set_viewport(task1, viewport1);
     render_server_render_task_set_camera(task1, camera1);
     render_server_render_task_set_priority(task1, 100000);
-    render_server_render_task_set_state(task1, RENDER_SERVER_RENDER_TASK_STATE_DISABLED);
+    // render_server_render_task_set_state(task1, RENDER_SERVER_RENDER_TASK_STATE_DISABLED);
 
     RenderServerViewport* viewport2 = render_server_viewport_surface_create(g_surface2);
     render_server_viewport_set_size(viewport2, &viewport_size);
