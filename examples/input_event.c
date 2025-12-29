@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+static void event_callback(const InputEvent* const event) {
+    printf("New event\n");
+}
+
 PlatformDriverWindow* g_win;
 RenderContextSurface* g_surface;
 
@@ -13,28 +17,7 @@ PlatformDriverWindow* g_win2;
 RenderContextSurface* g_surface2;
 PUBLIC void _ready(void) {
     vfs_mount_rfs("/");
-
-    /*
-    string* str_hello = string_from("Hello, ");
-    string* str_world = string_from("world!!!!");
-    string* str_hello_world;
-    string_new(&str_hello_world);
-
-    string_push_back(str_hello_world, str_hello);
-    string_push_back(str_hello_world, str_world);
-
-    string_free(str_hello);
-    string_free(str_world);
-
-    printf("String hello_world: %s\n", string_cstr(str_hello_world));
-
-    string* str_hello_world_hand = string_from("Hello, world!!!!");
-
-    printf("String equals: %b\n", string_equals(str_hello_world, str_hello_world_hand));
-
-    string_free(str_hello_world);
-    string_free(str_hello_world_hand);
-    */
+    input_event_connect(&event_callback);
 
     printf("wscw: %p\n", (void*) raw_platform_driver_create_window);
     printf("wswss: %p\n", (void*) raw_platform_driver_window_set_size);
@@ -100,17 +83,11 @@ PUBLIC void _ready(void) {
 static int g_count = 0;
 double g_time = 0;
 PUBLIC void _process(double delta) {
-    // printf("Process %d\n", count);
     g_time += delta;
     g_count++;
 
-    // if (count % 1000 == 0) {
-    // platform_driver_window_set_size(g_win, IVEC2_NEW_M(800 + 100 * sin(g_time), 600));
-    // platform_driver_window_set_size(g_win2, IVEC2_NEW_M(800, 600 + 75 * cos(g_time)));
-    // x}
-
     render_context_surface_present(g_surface);
-    //     render_context_surface_present(g_surface2);
+    render_context_surface_present(g_surface2);
 
     return;
 

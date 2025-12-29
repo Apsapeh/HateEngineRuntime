@@ -1,4 +1,5 @@
 #include "input_event.h"
+#include <ex_alloc/chunk_allocator.h>
 #include <platform/memory.h>
 #include <error.h>
 #include <helpers.h>
@@ -22,6 +23,17 @@
 #else
     #define EVENT_TYPE_CHECK(_, __, ___, ____)
 #endif
+
+
+static ChunkMemoryAllocator g_connectedFunctions;
+
+void input_event_init(void) {
+    chunk_memory_allocator_constructor(&g_connectedFunctions, sizeof(InputEventCallbackFunc), 16, 4);
+}
+
+void input_event_exit(void) {
+    chunk_memory_allocator_destructor(&g_connectedFunctions);
+}
 
 
 boolean input_event_constructor(InputEvent* self) {
@@ -84,6 +96,7 @@ InputEventType input_event_get_type(InputEvent* event) {
 boolean input_event_emit(const InputEvent* event) {
     ERROR_ARGS_CHECK_1(event, { return false; });
 
+
     if (event->type == INPUT_EVENT_TYPE_KEY) {
         LOG_INFO(
                 "Key: %d, IsPressed: %b, IsRepeat: %d", event->data.key.key, event->data.key.is_pressed,
@@ -105,6 +118,14 @@ boolean input_event_emit(const InputEvent* event) {
     }
 
     return true;
+}
+
+InputEventCallbackHandler input_event_connect(InputEventCallbackFunc func) {
+    ERROR_ARGS_CHECK_1(func, { return 0; });
+}
+
+
+boolean input_event_disconnect(InputEventCallbackHandler) {
 }
 
 

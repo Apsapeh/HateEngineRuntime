@@ -72,6 +72,7 @@ static void init(void) {
     log_init();
     uid_init();
     vfs_init();
+    input_event_init();
     platform_driver_init();
     render_context_init();
     render_server_init();
@@ -85,6 +86,7 @@ static void exit_init(void) {
     render_server_exit();
     render_context_exit();
     platform_driver_exit();
+    input_event_exit();
     vfs_exit();
     uid_exit();
     log_exit();

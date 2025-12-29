@@ -4,6 +4,7 @@
 #include <types/types.h>
 #include <input/mouse.h>
 #include <input/key.h>
+#include <ex_alloc/chunk_allocator.h>
 #include "math/vec2.h"
 
 
@@ -69,6 +70,24 @@ typedef struct {
     } data;
 } InputEvent;
 
+/**
+ * @brief InputEvent callback template
+ *
+ * @api
+ */
+typedef void (*InputEventCallbackFunc)(const InputEvent* const event);
+
+/**
+ * @brief Handler to the connected function, store it if you plan to disconnect it in the future
+ *
+ * @api
+ */
+typedef chunk_allocator_ptr InputEventCallbackHandler;
+
+
+void input_event_init(void);
+void input_event_exit(void);
+
 
 boolean input_event_constructor(InputEvent* self);
 
@@ -101,6 +120,16 @@ InputEventType input_event_get_type(InputEvent* event);
  * @api
  */
 boolean input_event_emit(const InputEvent* event);
+
+/**
+ * @api
+ */
+InputEventCallbackHandler input_event_connect(InputEventCallbackFunc func);
+
+/**
+ * @api
+ */
+boolean input_event_disconnect(InputEventCallbackHandler);
 
 
 /* ====================================> key Event <====================================*/
