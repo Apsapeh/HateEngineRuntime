@@ -163,7 +163,8 @@ boolean input_event_emit(const InputEvent* event) {
 InputEventCallbackHandler input_event_connect(InputEventCallbackFunc func) {
     ERROR_ARGS_CHECK_1(func, { return 0; });
     mutex_lock(g_connectedFunctionsMutex);
-    chunk_allocator_ptr ptr = chunk_memory_allocator_alloc_mem(&g_connectedFunctions);
+    InputEventCallbackFunc* f;
+    chunk_allocator_ptr ptr = chunk_memory_allocator_alloc_mem(&g_connectedFunctions, (void**) &f);
     mutex_unlock(g_connectedFunctionsMutex);
     if (!ptr) {
         LOG_ERROR_OR_DEBUG_FATAL(
@@ -172,8 +173,6 @@ InputEventCallbackHandler input_event_connect(InputEventCallbackFunc func) {
         return ptr;
     }
 
-    // TODO: change
-    InputEventCallbackFunc* f = chunk_memory_allocator_get_real_ptr(&g_connectedFunctions, ptr);
     *f = func;
     return ptr;
 }

@@ -287,6 +287,7 @@ void* chunk_memory_allocator_get_real_ptr_unsafe(
     const usize chunk_index = ptr / this->chunk_element_count;
     const usize element_in_chunk = ptr % this->chunk_element_count;
     return (char*) this->chunks.data[chunk_index] + element_in_chunk * this->element_size;
+}
 
 /* ====================================> Iterator <==================================== */
 
