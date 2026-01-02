@@ -8,10 +8,10 @@
 
 #include <teapot.h>
 
-static WindowServerWindow* g_win;
+static PlatformDriverWindow* g_win;
 static RenderContextSurface* g_surface;
 
-static WindowServerWindow* g_win2;
+static PlatformDriverWindow* g_win2;
 static RenderContextSurface* g_surface2;
 
 static RenderServerCamera* g_camera;
@@ -22,13 +22,13 @@ static RenderServerInstanceHandle g_instance;
 static Mat4 g_transform = MAT4_ONE_M;
 PUBLIC void _ready(void) {
     LOG_INFO("Hello ma boys!");
-    g_win = window_server_create_window("Hello", IVEC2_NEW_M(1280, 720), NULL);
+    g_win = platform_driver_create_window("Hello", IVEC2_NEW_M(1280, 720), NULL);
     ERROR_CATCH(g_win);
 
     g_surface = render_context_create_surface(g_win);
     ERROR_CATCH(g_surface);
 
-    g_win2 = window_server_create_window("Hello2", IVEC2_NEW_M(1280, 720), NULL);
+    g_win2 = platform_driver_create_window("Hello2", IVEC2_NEW_M(1280, 720), NULL);
     ERROR_CATCH(g_win2);
 
     g_surface2 = render_context_create_surface(g_win2);

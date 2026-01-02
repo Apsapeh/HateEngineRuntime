@@ -68,8 +68,6 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-// Train train tRain TRain Поезд Поезда
-
 
 static void init(void) {
     memory_init();
