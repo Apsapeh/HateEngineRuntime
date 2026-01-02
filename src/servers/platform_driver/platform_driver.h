@@ -89,6 +89,8 @@ typedef struct {
     boolean (*_init)(void);
     boolean (*_quit)(void);
 
+    boolean (*_poll_events)(void);
+
     PlatformDriverWindow* (*create_window)(const char* title, IVec2 size, PlatformDriverWindow* parent);
     boolean (*destroy_window)(PlatformDriverWindow* this);
 

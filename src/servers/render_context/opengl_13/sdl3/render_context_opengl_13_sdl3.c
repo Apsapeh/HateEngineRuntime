@@ -161,6 +161,8 @@ static RenderContextSurface* create_surface(PlatformDriverWindow* window) {
         signal_emit(&g_signalGlContextCreated, NULL);
     }
 
+    SDL_GL_SetSwapInterval(0);
+
     return (RenderContextSurface*) window;
 }
 

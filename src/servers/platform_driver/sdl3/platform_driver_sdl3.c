@@ -1,12 +1,14 @@
 #include "platform_driver_sdl3.h"
+#include "SDL3/SDL_events.h"
 #include "SDL3/SDL_init.h"
 #include "SDL3/SDL_video.h"
 #include "error.h"
 #include "log.h"
 #include "math/ivec2.h"
+#include "math/vec2.h"
 #include "servers/platform_driver/platform_driver.h"
 #include "types/types.h"
-#include "helpers.h"
+#include <events/input_event/input_event.h>
 
 /* ====> Errors <==== */
 #define NOT_MAIN_THREAD_ERROR "SDL3NotMainThread"
@@ -29,6 +31,8 @@
 const static u32 INIT_FLAGS = SDL_INIT_VIDEO | SDL_INIT_EVENTS;
 static u8 g_isInit = 0;
 
+static InputEvent g_inputEvent;
+
 static boolean _init(void) {
     if (!SDL_WasInit(INIT_FLAGS)) {
         if (!SDL_Init(INIT_FLAGS)) {
@@ -38,6 +42,7 @@ static boolean _init(void) {
         g_isInit = 1;
     }
 
+    input_event_constructor(&g_inputEvent);
     return true;
 }
 
@@ -45,6 +50,51 @@ static boolean _quit(void) {
     if (g_isInit) {
         SDL_QuitSubSystem(INIT_FLAGS);
     }
+    input_event_destructor(&g_inputEvent);
+    return true;
+}
+
+static SDL_Event g_event;
+static boolean _poll_events(void) {
+    while (SDL_PollEvent(&g_event)) {
+        if (g_event.type == SDL_EVENT_QUIT || g_event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+            return false;
+        } else {
+            switch (g_event.type) {
+                // Key up/down
+                case SDL_EVENT_KEY_UP:
+                case SDL_EVENT_KEY_DOWN:
+                    LOG_WARN("%c", g_event.key.key);
+                    input_event_set_type(&g_inputEvent, INPUT_EVENT_TYPE_KEY);
+                    input_event_key_set_key(&g_inputEvent, g_event.key.scancode);
+                    input_event_key_set_is_pressed(&g_inputEvent, g_event.key.down);
+                    input_event_key_set_is_repeat(&g_inputEvent, g_event.key.repeat);
+                    input_event_emit(&g_inputEvent);
+                    break;
+                // MouseButton up/down
+                case SDL_EVENT_MOUSE_BUTTON_UP:
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    input_event_set_type(&g_inputEvent, INPUT_EVENT_TYPE_MOUSE_BUTTON);
+                    input_event_mouse_button_set_button(&g_inputEvent, g_event.button.button);
+                    input_event_mouse_button_set_is_pressed(&g_inputEvent, g_event.button.down);
+                    input_event_mouse_button_set_clicks(&g_inputEvent, g_event.button.clicks);
+                    Vec2 mouse_button_coords = VEC2_NEW_M(g_event.button.x, g_event.button.y);
+                    input_event_mouse_button_set_coords(&g_inputEvent, &mouse_button_coords);
+                    input_event_emit(&g_inputEvent);
+                    break;
+                // MouseMotion
+                case SDL_EVENT_MOUSE_MOTION:
+                    input_event_set_type(&g_inputEvent, INPUT_EVENT_TYPE_MOUSE_MOTION);
+                    Vec2 mouse_motion_offset = VEC2_NEW_M(g_event.motion.xrel, g_event.motion.yrel);
+                    Vec2 mouse_motion_coords = VEC2_NEW_M(g_event.motion.x, g_event.motion.y);
+                    input_event_mouse_motion_set_offset(&g_inputEvent, &mouse_motion_offset);
+                    input_event_mouse_motion_set_coords(&g_inputEvent, &mouse_motion_coords);
+                    input_event_emit(&g_inputEvent);
+                    break;
+            }
+        }
+    };
+
     return true;
 }
 
@@ -179,6 +229,7 @@ void platform_driver_sdl3_backend_register(void) {
 
     REGISTER(_init);
     REGISTER(_quit);
+    REGISTER(_poll_events);
 
     REGISTER(create_window);
     REGISTER(destroy_window);

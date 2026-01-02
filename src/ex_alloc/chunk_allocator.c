@@ -259,3 +259,143 @@ void* chunk_memory_allocator_get_real_ptr(ChunkMemoryAllocator* this, chunk_allo
     }
     return NULL;
 }
+
+
+/* ====================================> Iterator <==================================== */
+
+#define IS_END_ITER 1 << 0
+
+boolean chunk_memory_allocator_iter_constructor(
+        ChunkMemoryAllocatorIter* self, ChunkMemoryAllocator* cma
+) {
+    ERROR_ARGS_CHECK_2(self, cma, { return false; });
+    self->chunk_idx = 0;
+    self->byte_idx = 0;
+    self->bit_idx = -1;
+    self->meta = 0;
+    self->cma = cma;
+    self->ptr = NULL; // If NULL - is begin iter
+
+    return true;
+}
+
+boolean chunk_memory_allocator_iter_destructor(ChunkMemoryAllocatorIter* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    return true;
+}
+
+ChunkMemoryAllocatorIter* chunk_memory_allocator_iter_new(ChunkMemoryAllocator* cma) {
+    ChunkMemoryAllocatorIter* allocator = tmalloc(sizeof(ChunkMemoryAllocatorIter));
+    ERROR_ALLOC_CHECK(allocator, { return NULL; });
+
+    boolean success = chunk_memory_allocator_iter_constructor(allocator, cma);
+
+    if (success)
+        return allocator;
+    else {
+        tfree(allocator);
+        return NULL;
+    }
+}
+
+boolean chunk_memory_allocator_iter_free(ChunkMemoryAllocatorIter* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    if (chunk_memory_allocator_iter_destructor(self)) {
+        tfree(self);
+        return true;
+    } else {
+        return false;
+    }
+}
+
+boolean chunk_memory_allocator_iter_next(ChunkMemoryAllocatorIter* self, void** real_ptr) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+
+    if (self->meta & IS_END_ITER)
+        return false;
+
+    ChunkMemoryAllocator* cma = self->cma;
+
+    u32 start_byte_idx = self->byte_idx;
+    u32 start_bit_idx = self->bit_idx + 1;
+
+    for (usize chunk_idx = self->chunk_idx; chunk_idx < cma->chunks.size; ++chunk_idx) {
+        const usize chunk_offset = chunk_idx * cma->chunk_bitfield_size;
+        // If we iterate just from prev iter then byte_idx = prev iter byte idx
+        // Otherwise if we iterate in next chunk byte_idx = 0
+        usize byte_idx = start_byte_idx;
+        start_byte_idx = 0;
+        for (; byte_idx < cma->chunk_bitfield_size; ++byte_idx) {
+            const usize bitfield_byte_idx = chunk_offset + byte_idx;
+            u8 byte = cma->chunks_bitfield.data[bitfield_byte_idx];
+
+            byte >>= start_bit_idx;
+            if (byte == 0) {
+                start_bit_idx = 0;
+                continue;
+            }
+
+#if (defined(__GNUC__) || defined(__clang__))
+            self->chunk_idx = chunk_idx;
+            self->byte_idx = byte_idx;
+            self->bit_idx = start_bit_idx + __builtin_ctz(byte);
+#else
+            for (u8 i = 0; byte; ++i) {
+                if (byte & (1 << i)) {
+                    self->chunk_idx = chunk_idx;
+                    self->byte_idx = byte_idx;
+                    self->bit_idx = start_bit_idx + i;
+                    break;
+                }
+                byte >>= 1;
+            }
+
+#endif
+            start_bit_idx = 0;
+
+            self->ptr = (u8*) cma->chunks.data[self->chunk_idx] +
+                        (self->byte_idx * 8 + self->bit_idx) * cma->element_size;
+
+            if (real_ptr)
+                *real_ptr = self->ptr;
+            return true;
+        }
+    }
+
+    self->meta = IS_END_ITER;
+    return false;
+}
+
+void* chunk_memory_allocator_iter_get_real_ptr(ChunkMemoryAllocatorIter* self) {
+    ERROR_ARGS_CHECK_1(self, { return NULL; });
+
+    if (self->ptr == NULL) {
+        LOG_ERROR_OR_DEBUG_FATAL(
+                "chunk_memory_allocator_iter_get_real_ptr: You must first call "
+                "'chunk_memory_allocator_iter_next'"
+        );
+        set_error(ERROR_INVALID_STATE);
+        return NULL;
+    }
+
+    if (self->meta & IS_END_ITER) {
+        LOG_ERROR_OR_DEBUG_FATAL(
+                "chunk_memory_allocator_iter_get_real_ptr: Iterator is ended "
+                "'chunk_memory_allocator_iter_next'"
+        );
+        set_error(ERROR_INVALID_STATE);
+        return NULL;
+    }
+
+    return self->ptr;
+}
+
+boolean chunk_memory_allocator_iter_is_begin(ChunkMemoryAllocatorIter* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    return self->ptr == NULL;
+}
+
+boolean chunk_memory_allocator_iter_is_end(ChunkMemoryAllocatorIter* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    return self->meta & IS_END_ITER;
+}
