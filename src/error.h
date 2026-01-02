@@ -85,6 +85,14 @@ typedef c_str Error;
 #else
     #define ERROR_ALLOC_CHECK(arg, to_return)
 #endif
+#define ERROR_RANGE_CHECK(var, first, last, end_block)                                                  \
+    do {                                                                                                \
+        if (var < first || var > last) {                                                                \
+            LOG_ERROR_OR_DEBUG_FATAL("Unkonwn '" #var "' - %d", var);                                   \
+            set_error(ERROR_INVALID_ARGUMENT_RANGE);                                                    \
+            end_block                                                                                   \
+        }                                                                                               \
+    } while (0);
 
 
 #define ERROR_ASSERT(error, ...) ERROR_ASSERT_FATAL(error, __VA_ARGS__)
@@ -93,6 +101,7 @@ typedef c_str Error;
 
 #define ERROR_NOT_IMPLEMENTED "NotImplemented"
 #define ERROR_INVALID_ARGUMENT "InvalidArgument"
+#define ERROR_INVALID_ARGUMENT_RANGE "InvalidArgumentRange"
 #define ERROR_ALREADY_EXISTS "AlreadyExists"
 #define ERROR_NOT_FOUND "NotFound"
 #define ERROR_INVALID_STATE "InvalidState"

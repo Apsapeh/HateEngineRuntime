@@ -1,12 +1,14 @@
-#include "window_server_sdl3.h"
+#include "platform_driver_sdl3.h"
+#include "SDL3/SDL_events.h"
 #include "SDL3/SDL_init.h"
 #include "SDL3/SDL_video.h"
 #include "error.h"
 #include "log.h"
 #include "math/ivec2.h"
-#include "servers/window_server/window_server.h"
+#include "math/vec2.h"
+#include "servers/platform_driver/platform_driver.h"
 #include "types/types.h"
-#include "helpers.h"
+#include <events/input_event/input_event.h>
 
 /* ====> Errors <==== */
 #define NOT_MAIN_THREAD_ERROR "SDL3NotMainThread"
@@ -18,7 +20,7 @@
     do {                                                                                                \
         if (!SDL_IsMainThread()) {                                                                      \
             LOG_ERROR(                                                                                  \
-                    "WindowServer(SDL3)::" #function " must be called only from main thread or "        \
+                    "PlatformDriver(SDL3)::" #function " must be called only from main thread or "      \
                     "via call_deferred/call_deferred_async"                                             \
             )                                                                                           \
             set_error(NOT_MAIN_THREAD_ERROR);                                                           \
@@ -29,6 +31,8 @@
 const static u32 INIT_FLAGS = SDL_INIT_VIDEO | SDL_INIT_EVENTS;
 static u8 g_isInit = 0;
 
+static InputEvent g_inputEvent;
+
 static boolean _init(void) {
     if (!SDL_WasInit(INIT_FLAGS)) {
         if (!SDL_Init(INIT_FLAGS)) {
@@ -38,6 +42,7 @@ static boolean _init(void) {
         g_isInit = 1;
     }
 
+    input_event_constructor(&g_inputEvent);
     return true;
 }
 
@@ -45,11 +50,56 @@ static boolean _quit(void) {
     if (g_isInit) {
         SDL_QuitSubSystem(INIT_FLAGS);
     }
+    input_event_destructor(&g_inputEvent);
+    return true;
+}
+
+static SDL_Event g_event;
+static boolean _poll_events(void) {
+    while (SDL_PollEvent(&g_event)) {
+        if (g_event.type == SDL_EVENT_QUIT || g_event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
+            return false;
+        } else {
+            switch (g_event.type) {
+                // Key up/down
+                case SDL_EVENT_KEY_UP:
+                case SDL_EVENT_KEY_DOWN:
+                    LOG_WARN("%c", g_event.key.key);
+                    input_event_set_type(&g_inputEvent, INPUT_EVENT_TYPE_KEY);
+                    input_event_key_set_key(&g_inputEvent, g_event.key.scancode);
+                    input_event_key_set_is_pressed(&g_inputEvent, g_event.key.down);
+                    input_event_key_set_is_repeat(&g_inputEvent, g_event.key.repeat);
+                    input_event_emit(&g_inputEvent);
+                    break;
+                // MouseButton up/down
+                case SDL_EVENT_MOUSE_BUTTON_UP:
+                case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    input_event_set_type(&g_inputEvent, INPUT_EVENT_TYPE_MOUSE_BUTTON);
+                    input_event_mouse_button_set_button(&g_inputEvent, g_event.button.button);
+                    input_event_mouse_button_set_is_pressed(&g_inputEvent, g_event.button.down);
+                    input_event_mouse_button_set_clicks(&g_inputEvent, g_event.button.clicks);
+                    Vec2 mouse_button_coords = VEC2_NEW_M(g_event.button.x, g_event.button.y);
+                    input_event_mouse_button_set_coords(&g_inputEvent, &mouse_button_coords);
+                    input_event_emit(&g_inputEvent);
+                    break;
+                // MouseMotion
+                case SDL_EVENT_MOUSE_MOTION:
+                    input_event_set_type(&g_inputEvent, INPUT_EVENT_TYPE_MOUSE_MOTION);
+                    Vec2 mouse_motion_offset = VEC2_NEW_M(g_event.motion.xrel, g_event.motion.yrel);
+                    Vec2 mouse_motion_coords = VEC2_NEW_M(g_event.motion.x, g_event.motion.y);
+                    input_event_mouse_motion_set_offset(&g_inputEvent, &mouse_motion_offset);
+                    input_event_mouse_motion_set_coords(&g_inputEvent, &mouse_motion_coords);
+                    input_event_emit(&g_inputEvent);
+                    break;
+            }
+        }
+    };
+
     return true;
 }
 
 
-static WindowServerWindow* create_window(const char* title, IVec2 size, WindowServerWindow* parent) {
+static PlatformDriverWindow* create_window(const char* title, IVec2 size, PlatformDriverWindow* parent) {
     ERROR_ARGS_CHECK_1(title, { return NULL; });
     MAIN_THREAD_CHECK(create_window, { return NULL; });
 
@@ -59,10 +109,10 @@ static WindowServerWindow* create_window(const char* title, IVec2 size, WindowSe
         set_error(ANY_ERROR);
         return NULL;
     }
-    return (WindowServerWindow*) window;
+    return (PlatformDriverWindow*) window;
 }
 
-static boolean destroy_window(WindowServerWindow* this) {
+static boolean destroy_window(PlatformDriverWindow* this) {
     ERROR_ARGS_CHECK_1(this, { return false; });
     MAIN_THREAD_CHECK(destroy_window, { return false; });
 
@@ -71,7 +121,7 @@ static boolean destroy_window(WindowServerWindow* this) {
 }
 
 
-static boolean window_set_title(WindowServerWindow* this, const char* title) {
+static boolean window_set_title(PlatformDriverWindow* this, const char* title) {
     ERROR_ARGS_CHECK_2(this, title, { return false; });
     MAIN_THREAD_CHECK(window_set_title, { return false; });
 
@@ -83,7 +133,7 @@ static boolean window_set_title(WindowServerWindow* this, const char* title) {
     return true;
 }
 
-static c_str window_get_title(WindowServerWindow* this) {
+static c_str window_get_title(PlatformDriverWindow* this) {
     ERROR_ARG_CHECK(this, { return NULL; });
     MAIN_THREAD_CHECK(window_get_title, { return NULL; });
 
@@ -91,7 +141,7 @@ static c_str window_get_title(WindowServerWindow* this) {
 }
 
 
-static boolean window_set_mode(WindowServerWindow* this, WindowServerWindowMode mode) {
+static boolean window_set_mode(PlatformDriverWindow* this, PlatformDriverWindowMode mode) {
     ERROR_ARGS_CHECK_1(this, { return false; });
     MAIN_THREAD_CHECK(window_set_mode, { return false; });
 
@@ -102,19 +152,19 @@ static boolean window_set_mode(WindowServerWindow* this, WindowServerWindowMode 
     return true;
 }
 
-static WindowServerWindowMode window_get_mode(WindowServerWindow* this) {
-    ERROR_ARGS_CHECK_1(this, { return WINDOW_SERVER_WINDOW_MODE_UNKNOWN; });
-    MAIN_THREAD_CHECK(window_get_mode, { return WINDOW_SERVER_WINDOW_MODE_UNKNOWN; });
+static PlatformDriverWindowMode window_get_mode(PlatformDriverWindow* this) {
+    ERROR_ARGS_CHECK_1(this, { return PLATFORM_DRIVER_WINDOW_MODE_UNKNOWN; });
+    MAIN_THREAD_CHECK(window_get_mode, { return PLATFORM_DRIVER_WINDOW_MODE_UNKNOWN; });
 
     // TODO: Implement this function
     set_error(ERROR_NOT_IMPLEMENTED);
-    return WINDOW_SERVER_WINDOW_MODE_UNKNOWN;
+    return PLATFORM_DRIVER_WINDOW_MODE_UNKNOWN;
 
-    return WINDOW_SERVER_WINDOW_MODE_UNKNOWN;
+    return PLATFORM_DRIVER_WINDOW_MODE_UNKNOWN;
 }
 
 
-static boolean window_set_size(WindowServerWindow* this, IVec2 dimensions) {
+static boolean window_set_size(PlatformDriverWindow* this, IVec2 dimensions) {
     ERROR_ARGS_CHECK_1(this, { return false; });
     MAIN_THREAD_CHECK(window_set_size, { return false; });
 
@@ -126,7 +176,7 @@ static boolean window_set_size(WindowServerWindow* this, IVec2 dimensions) {
     return true;
 }
 
-static boolean window_get_size(WindowServerWindow* this, IVec2* out) {
+static boolean window_get_size(PlatformDriverWindow* this, IVec2* out) {
     ERROR_ARGS_CHECK_2(this, out, { return false; });
     MAIN_THREAD_CHECK(window_get_size, { return false; });
 
@@ -143,7 +193,7 @@ static boolean window_get_size(WindowServerWindow* this, IVec2* out) {
 }
 
 
-static boolean window_set_position(WindowServerWindow* this, IVec2 dimensions) {
+static boolean window_set_position(PlatformDriverWindow* this, IVec2 dimensions) {
     ERROR_ARGS_CHECK_1(this, { return false; });
     MAIN_THREAD_CHECK(window_set_position, { return false; });
 
@@ -155,7 +205,7 @@ static boolean window_set_position(WindowServerWindow* this, IVec2 dimensions) {
     return true;
 }
 
-static boolean window_get_position(WindowServerWindow* this, IVec2* out) {
+static boolean window_get_position(PlatformDriverWindow* this, IVec2* out) {
     ERROR_ARGS_CHECK_2(this, out, { return false; });
     MAIN_THREAD_CHECK(window_get_position, { return false; });
 
@@ -172,13 +222,14 @@ static boolean window_get_position(WindowServerWindow* this, IVec2* out) {
 }
 
 
-#define REGISTER(fn) window_server_backend_set_function(ws, #fn, (void (*)(void)) fn)
+#define REGISTER(fn) platform_driver_backend_set_function(ws, #fn, (void (*)(void)) fn)
 
-void window_server_sdl3_backend_register(void) {
-    WindowServerBackend* ws = window_server_backend_new();
+void platform_driver_sdl3_backend_register(void) {
+    PlatformDriverBackend* ws = platform_driver_backend_new();
 
     REGISTER(_init);
     REGISTER(_quit);
+    REGISTER(_poll_events);
 
     REGISTER(create_window);
     REGISTER(destroy_window);
@@ -197,5 +248,5 @@ void window_server_sdl3_backend_register(void) {
 
     // REGISTER(window_set_fullscreen_display);
 
-    window_server_register_backend("SDL3", ws);
+    platform_driver_register_backend("SDL3", ws);
 }

@@ -145,3 +145,4 @@ end
 declare_exmaple("Dev", "examples/dev.c")
 declare_exmaple("Signal", "examples/signal.c")
 declare_exmaple("RenderServer", "examples/render_server.c")
+declare_exmaple("InputEvent", "examples/input_event.c")

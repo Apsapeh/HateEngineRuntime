@@ -2,6 +2,7 @@
 
 #include "SDL3/SDL_events.h"
 #include "SDL3/SDL_timer.h"
+#include "events/input_event/input_event.h"
 #include "log.h"
 #include "platform/memory.h"
 
@@ -10,7 +11,7 @@
 #include "servers/render_server/render_server.h"
 #include "types/uid.h"
 #include "vfs/vfs.h"
-#include "servers/window_server/window_server.h"
+#include "servers/platform_driver/platform_driver.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -31,13 +32,27 @@ int main(int argc, char* argv[]) {
     GameFunctions game_functions = load_game();
     game_functions._ready();
 
-    SDL_Event event;
+    InputEvent* input_event = input_event_new();
+    u64 prev_time = SDL_GetTicksNS();
+    u32 frame_counter = 0;
+    u64 time_counter = 0;
     while (1) {
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT || event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) {
-                return 0;
-            }
-        };
+        u64 cur_time = SDL_GetTicksNS();
+        float delta = (float) (cur_time - prev_time) / 1000000000;
+        ++frame_counter;
+        time_counter += cur_time - prev_time;
+        prev_time = cur_time;
+
+        if (time_counter >= 1000000000) {
+            LOG_INFO("%u", frame_counter);
+            frame_counter = 0;
+            time_counter = 0;
+        }
+
+        if (!PlatformDriver._poll_events()) {
+            break;
+        }
+
         game_functions._process(0.166);
 
         render_server_begin_frame(); // Исполняем очередь команд
@@ -47,6 +62,8 @@ int main(int argc, char* argv[]) {
         render_server_end_frame();
         SDL_DelayNS(16660000);
     }
+
+    input_event_free(input_event);
 
     return 0;
 }
@@ -59,15 +76,21 @@ static void init(void) {
     log_init();
     uid_init();
     vfs_init();
-    window_server_init();
+    input_event_init();
+    platform_driver_init();
     render_context_init();
     render_server_init();
 }
 
 static void exit_init(void) {
+    RenderServer._quit();
+    RenderContext._quit();
+    PlatformDriver._quit();
+
     render_server_exit();
     render_context_exit();
-    window_server_exit();
+    platform_driver_exit();
+    input_event_exit();
     vfs_exit();
     uid_exit();
     log_exit();

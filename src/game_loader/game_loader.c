@@ -4,7 +4,7 @@
 #include "log.h"
 #include "servers/render_context/render_context.h"
 #include "servers/render_server/render_server.h"
-#include "servers/window_server/window_server.h"
+#include "servers/platform_driver/platform_driver.h"
 #include <string.h>
 
 
@@ -31,19 +31,19 @@ GameFunctions load_game(void) {
     render_context_load_backend("OpenGL 1.3", "SDL3");
     CHECK_SERVER_LOAD(render_context, "RenderContext isn't loaded")
 
-    window_server_load_backend("SDL3");
-    CHECK_SERVER_LOAD(window_server, "Window Server isn't loaded")
+    platform_driver_load_backend("SDL3");
+    CHECK_SERVER_LOAD(platform_driver, "PlatformDriver isn't loaded")
 
     render_server_load_backend("OpenGL 1.3", RENDER_SERVER_THREAD_MODE_SYNC);
     CHECK_SERVER_LOAD(render_server, "Render Server isn't loaded")
 
     RenderContext._init();
-    WindowServer._init();
+    PlatformDriver._init();
     RenderServer._init();
 
     // Stage 3: Init servers
     fn_env._render_context_init(&RenderContext);
-    fn_env._window_server_init(&WindowServer);
+    fn_env._platform_driver_init(&PlatformDriver);
     fn_env._render_server_init(&RenderServer);
 
     game_functions._ready = fn_env._ready;
