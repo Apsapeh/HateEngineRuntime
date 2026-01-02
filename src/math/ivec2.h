@@ -17,7 +17,7 @@ typedef struct {
     (IVec2) {                                                                                           \
         .x = v_x, .y = v_y                                                                              \
     }
-#define IVEC2_NEW_VAL_M IVEC2_NEW_M(v, v)
+#define IVEC2_NEW_VAL_M(v) IVEC2_NEW_M(v, v)
 #define IVEC2_ZERO_M IVEC2_NEW_VAL_M(0)
 #define IVEC2_ONE_M IVEC2_NEW_VAL_M(1)
 #define IVEC2_MINUS_ONE_M IVEC2_NEW_VAL_M(-1)

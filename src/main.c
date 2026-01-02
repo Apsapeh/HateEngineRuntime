@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "SDL3/SDL_events.h"
@@ -23,7 +22,6 @@ static void init(void);
 static void exit_init(void);
 
 int main(int argc, char* argv[]) {
-    system("pwd");
     if (!parse_cli_args(argc, argv)) {
         return 0;
     }
@@ -56,7 +54,13 @@ int main(int argc, char* argv[]) {
         }
 
         game_functions._process(0.166);
-        // SDL_DelayNS(16660000);
+
+        render_server_begin_frame(); // Исполняем очередь команд
+        game_functions._render(0.166);
+        RenderServer._draw(0.166);
+
+        render_server_end_frame();
+        SDL_DelayNS(16660000);
     }
 
     input_event_free(input_event);

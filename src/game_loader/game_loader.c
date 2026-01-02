@@ -34,7 +34,7 @@ GameFunctions load_game(void) {
     platform_driver_load_backend("SDL3");
     CHECK_SERVER_LOAD(platform_driver, "PlatformDriver isn't loaded")
 
-    render_server_load_backend("OpenGL 1.3");
+    render_server_load_backend("OpenGL 1.3", RENDER_SERVER_THREAD_MODE_SYNC);
     CHECK_SERVER_LOAD(render_server, "Render Server isn't loaded")
 
     RenderContext._init();
@@ -49,21 +49,23 @@ GameFunctions load_game(void) {
     game_functions._ready = fn_env._ready;
     game_functions._process = fn_env._process;
     game_functions._physics_process = fn_env._physics_process;
+    game_functions._render = fn_env._render;
 
     return game_functions;
 }
 
 #include <api_sym_lookup_table.h.gen>
-void* runtime_proc_loader(const char* name) {
-    for (usize i = 0; i < sizeof(g_apiFunctionLookupTable) / sizeof(g_apiFunctionLookupTable[0]); i++) {
-        if (strcmp(g_apiFunctionLookupTable[i].name, name) == 0) {
-            return g_apiFunctionLookupTable[i].ptr;
-        }
-    }
-    return NULL;
-}
+// void* _runtime_proc_loader(const char* name) {
+//     for (usize i = 0; i < sizeof(g_apiFunctionLookupTable) / sizeof(g_apiFunctionLookupTable[0]); i++)
+//     {
+//         if (strcmp(g_apiFunctionLookupTable[i].name, name) == 0) {
+//             return g_apiFunctionLookupTable[i].ptr;
+//         }
+//     }
+//     return NULL;
+// }
 
-void* _runtime_proc_loader(const char* name) {
+void* runtime_proc_loader(const char* name) {
     usize left = 0;
     usize right = sizeof(g_apiFunctionLookupTable) / sizeof(g_apiFunctionLookupTable[0]) - 1;
 

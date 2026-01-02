@@ -16,7 +16,7 @@ def parse() -> ParseResult:
 
     result = ParseResult()
     for filename in glob("src/**/*.h", recursive=True):
-        f = filename[len("src") + 1:]
+        f = filename[len("src") + 1 :]
 
         if f in GLOB_BLACK_LIST:
             continue
@@ -120,6 +120,7 @@ def parse_function_decl(cursor: cc.Cursor, doc: str) -> Function:
     for arg in cursor.get_arguments():
         arg_type = arg.type.spelling
         arg_name = arg.spelling or ""
+
         name_i = 0
         used_names = set(arg_name)
         if arg_name == "":
@@ -136,6 +137,7 @@ def parse_function_decl(cursor: cc.Cursor, doc: str) -> Function:
         func_name,
         return_type,
         args,
+        cursor.type.is_function_variadic(),
         str(cursor.location.file),
         int(cursor.location.line),
         doc,
@@ -238,8 +240,15 @@ def parse_struct_decl(
                             args.append(FunctionArg(arg.type.spelling, name))
 
                         functions.append(
-                            Function(fn_name, return_type,
-                                     args, filename, line, doc)
+                            Function(
+                                fn_name,
+                                return_type,
+                                args,
+                                False,
+                                filename,
+                                line,
+                                doc,
+                            )
                         )
 
         result.add_server(
@@ -270,7 +279,10 @@ def parse_typedef_decl(cursor: cc.Cursor) -> ParseResult:
     if cursor.underlying_typedef_type.kind == cc.TypeKind.POINTER:
         pointee = cursor.underlying_typedef_type.get_pointee()
         # print(pointee.kind)
-        if pointee.kind == cc.TypeKind.FUNCTIONPROTO or pointee.kind == cc.TypeKind.FUNCTIONNOPROTO:
+        if (
+            pointee.kind == cc.TypeKind.FUNCTIONPROTO
+            or pointee.kind == cc.TypeKind.FUNCTIONNOPROTO
+        ):
             args = []
             name_i = 0
             used_names = set()
@@ -293,6 +305,7 @@ def parse_typedef_decl(cursor: cc.Cursor) -> ParseResult:
                 cursor.spelling,
                 pointee.get_result().spelling,
                 args,
+                False,
                 str(cursor.location.file),
                 int(cursor.location.line),
                 cursor.raw_comment,
@@ -322,7 +335,10 @@ def parse_typedef_decl(cursor: cc.Cursor) -> ParseResult:
     elif cursor.underlying_typedef_type.kind == cc.TypeKind.ELABORATED:
         elaborated = cursor.underlying_typedef_type.get_declaration()
         # Only typedef struct Name Name; without body
-        if elaborated.kind == CK.STRUCT_DECL and len(list(elaborated.get_children())) == 0:
+        if (
+            elaborated.kind == CK.STRUCT_DECL
+            and len(list(elaborated.get_children())) == 0
+        ):
             result.add_struct(
                 Struct(
                     cursor.spelling,
@@ -332,10 +348,13 @@ def parse_typedef_decl(cursor: cc.Cursor) -> ParseResult:
                 )
             )
             return result
-        
-        elif elaborated.kind == CK.STRUCT_DECL and len(list(elaborated.get_children())) > 0:
+
+        elif (
+            elaborated.kind == CK.STRUCT_DECL
+            and len(list(elaborated.get_children())) > 0
+        ):
             pass
-            
+
         # typedef u64 UID; (u64 is another typedef to uint64_t)
         elif elaborated.kind == CK.TYPEDEF_DECL:
             result.add_typedef(
@@ -407,18 +426,15 @@ def manual_parse(filename: str) -> ParseResult:
 
             name = j["name"]
             if name == None:
-                error.error(
-                    f"Invalid api enum in {filename}, missing name : {enum}")
+                error.error(f"Invalid api enum in {filename}, missing name : {enum}")
 
             data_type = j["type"]
             if data_type == None:
-                error.error(
-                    f"Invalid api enum in {filename}, missing type : {enum}")
+                error.error(f"Invalid api enum in {filename}, missing type : {enum}")
 
             values = j["values"]
             if values == None:
-                error.error(
-                    f"Invalid api enum in {filename}, missing values : {enum}")
+                error.error(f"Invalid api enum in {filename}, missing values : {enum}")
 
             r_values = []
             for value in values:
@@ -429,19 +445,16 @@ def manual_parse(filename: str) -> ParseResult:
 
                 r_values.append(ApiEnumValue(value[0], value[1]))
 
-            result.add_api_enum(
-                ApiEnum(name, data_type, r_values, str(filename), 0))
+            result.add_api_enum(ApiEnum(name, data_type, r_values, str(filename), 0))
 
         except json.JSONDecodeError as exception:
-            error.error(
-                f"Invalid api enum in {filename} : {enum}\n{exception}")
+            error.error(f"Invalid api enum in {filename} : {enum}\n{exception}")
 
     return result
 
 
 def doxygen_comment_parse(comment: str):
-    clean_comment = re.sub(r"^\s*/\*+|\s*\*/\s*$", "",
-                           comment, flags=re.MULTILINE)
+    clean_comment = re.sub(r"^\s*/\*+|\s*\*/\s*$", "", comment, flags=re.MULTILINE)
 
     blocks = []
     tmp_arr = []

@@ -59,16 +59,32 @@ typedef c_str Error;
     ERROR_ARG_CHECK(c, end_block);                                                                      \
     ERROR_ARG_CHECK(d, end_block)
 
-
-#define ERROR_ALLOC_CHECK(arg, to_return)                                                               \
+#define ERROR_CATCH(result)                                                                             \
     do {                                                                                                \
-        if (!(arg)) {                                                                                   \
-            LOG_ERROR_OR_DEBUG_FATAL("Memory allocation failed for '" #arg "'");                        \
-            set_error(ERROR_ALLOCATION_FAILED);                                                         \
-            to_return                                                                                   \
+        if (!result) {                                                                                  \
+            LOG_FATAL("Catched error: %s", get_error());                                                 \
         }                                                                                               \
     } while (0)
 
+#define ERROR_CATCH_OR(result, body)                                                                    \
+    do {                                                                                                \
+        if (!result) {                                                                                  \
+            body                                                                                        \
+        }                                                                                               \
+    } while (0)
+
+#ifdef HE_DEBUG
+    #define ERROR_ALLOC_CHECK(arg, to_return)                                                           \
+        do {                                                                                            \
+            if (!(arg)) {                                                                               \
+                LOG_ERROR_OR_DEBUG_FATAL("Memory allocation failed for '" #arg "'");                    \
+                set_error(ERROR_ALLOCATION_FAILED);                                                     \
+                to_return                                                                               \
+            }                                                                                           \
+        } while (0)
+#else
+    #define ERROR_ALLOC_CHECK(arg, to_return)
+#endif
 #define ERROR_RANGE_CHECK(var, first, last, end_block)                                                  \
     do {                                                                                                \
         if (var < first || var > last) {                                                                \

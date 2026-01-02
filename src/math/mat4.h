@@ -1,7 +1,9 @@
 #pragma once
 
+#include <types/types.h>
+
 /**
- * @brief Primitive 4x4 matrix
+ * @brief Primitive 4x4 matrix. Row-major
  *
  * Raw data - m
  *
@@ -80,7 +82,7 @@ typedef struct {
  *
  * @api
  */
-void mat4_init(
+boolean mat4_init(
         float m00, float m01, float m02, float m03, float m10, float m11, float m12, float m13,
         float m20, float m21, float m22, float m23, float m30, float m31, float m32, float m33,
         Mat4* const out
@@ -94,7 +96,7 @@ void mat4_init(
  *
  * @api
  */
-void mat4_from_array(const float* const array, Mat4* const out);
+boolean mat4_from_array(const float* const array, Mat4* const out);
 
 /**
  * @brief
@@ -104,18 +106,7 @@ void mat4_from_array(const float* const array, Mat4* const out);
  *
  * @api
  */
-void mat4_clone(const Mat4* const a, Mat4* const out);
-
-/**
- * @brief
- *
- * @param a
- * @param b
- * @return Mat4
- *
- * @api
- */
-void mat4_add(const Mat4* const a, const Mat4* const b, Mat4* const out);
+boolean mat4_clone(const Mat4* const a, Mat4* const out);
 
 /**
  * @brief
@@ -126,7 +117,7 @@ void mat4_add(const Mat4* const a, const Mat4* const b, Mat4* const out);
  *
  * @api
  */
-void mat4_sub(const Mat4* const a, const Mat4* const b, Mat4* const out);
+boolean mat4_add(const Mat4* const a, const Mat4* const b, Mat4* const out);
 
 /**
  * @brief
@@ -137,7 +128,18 @@ void mat4_sub(const Mat4* const a, const Mat4* const b, Mat4* const out);
  *
  * @api
  */
-void mat4_mul(const Mat4* const a, const Mat4* const b, Mat4* const out);
+boolean mat4_sub(const Mat4* const a, const Mat4* const b, Mat4* const out);
+
+/**
+ * @brief
+ *
+ * @param a
+ * @param b
+ * @return Mat4
+ *
+ * @api
+ */
+boolean mat4_mul(const Mat4* const a, const Mat4* const b, Mat4* const out);
 
 /**
  * @brief
@@ -148,7 +150,7 @@ void mat4_mul(const Mat4* const a, const Mat4* const b, Mat4* const out);
  *
  * @api
  */
-void mat4_scale(const Mat4* const a, const float factor, Mat4* const out);
+boolean mat4_factor(const Mat4* const a, const float factor, Mat4* const out);
 
 /**
  * @brief
@@ -158,7 +160,7 @@ void mat4_scale(const Mat4* const a, const float factor, Mat4* const out);
  *
  * @api
  */
-void mat4_transpose(const Mat4* const a, Mat4* const out);
+boolean mat4_transpose(const Mat4* const a, Mat4* const out);
 
 /**
  * @brief
@@ -168,4 +170,143 @@ void mat4_transpose(const Mat4* const a, Mat4* const out);
  *
  * @api
  */
-void mat4_inverse(const Mat4* const a, Mat4* const out);
+boolean mat4_inverse(const Mat4* const a, Mat4* const out);
+
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_translate_make(float tx, float ty, float tz, Mat4* const out);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_translate(const Mat4* const a, float tx, float ty, float tz, Mat4* const out);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_translate_in(Mat4* const a, float tx, float ty, float tz);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_translate_local(const Mat4* const a, float tx, float ty, float tz, Mat4* const out);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_translate_local_in(Mat4* const a, float tx, float ty, float tz);
+
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_scale_make(float sx, float sy, float sz, Mat4* const out);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_scale(const Mat4* const a, float sx, float sy, float sz, Mat4* const out);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_scale_in(Mat4* const a, float sx, float sy, float sz);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_scale_local(const Mat4* const a, float sx, float sy, float sz, Mat4* const out);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_scale_local_in(Mat4* const a, float sx, float sy, float sz);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_rotate_make(float angle, float ax, float ay, float az, Mat4* const out);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_rotate(const Mat4* const a, float angle, float ax, float ay, float az, Mat4* const out);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_rotate_in(Mat4* const a, float angle, float ax, float ay, float az);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_rotate_local(
+        const Mat4* const a, float angle, float ax, float ay, float az, Mat4* const out
+);
+
+/**
+ * @brief
+ *
+ * @return[out] out
+ *
+ * @api
+ */
+boolean mat4_rotate_local_in(Mat4* const a, float angle, float ax, float ay, float az);

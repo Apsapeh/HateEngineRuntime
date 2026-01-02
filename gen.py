@@ -18,7 +18,7 @@ tools_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tools/")
 sys.path.insert(0, tools_dir)
 
 apg = __import__("api-generator")
-server_gen = __import__("server-setget-pairs-generator")
+server_gen = __import__("server-src-generator")
 
 from tools.api_generator import parser
 

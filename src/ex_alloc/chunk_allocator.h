@@ -4,6 +4,8 @@
 #include <types/vector.h>
 
 
+// TODO: Rewrite to typed version
+
 /**
  * @brief Virtual memory ptr
  *
@@ -11,7 +13,7 @@
  *
  * @api
  */
-typedef u32 chunk_allocator_ptr;
+typedef u64 chunk_allocator_ptr;
 
 /*
  * Chunk stores as SOA.
@@ -74,12 +76,13 @@ boolean chunk_memory_allocator_free(ChunkMemoryAllocator* this);
 /**
  * @return 0 on failure
  *
+ * @param [out] real_ptr Ptr to real memory. Can be NULL
  *
  * @error "InvalidArgument"
  * @error "AllocationFailed" Real memory can't be allocated
  * @api
  */
-chunk_allocator_ptr chunk_memory_allocator_alloc_mem(ChunkMemoryAllocator* this);
+chunk_allocator_ptr chunk_memory_allocator_alloc_mem(ChunkMemoryAllocator* this, void** real_ptr);
 
 /**
  * @error "InvalidArgument"
@@ -89,13 +92,20 @@ boolean chunk_memory_allocator_free_mem(ChunkMemoryAllocator* this, chunk_alloca
 
 /**
  * @brief Return a real pointer to data
- * @warning You to owned this pointer
+ * @warning You don't own this pointer
  *
  * @error "InvalidArgument"
  * @api
  */
 void* chunk_memory_allocator_get_real_ptr(ChunkMemoryAllocator* this, chunk_allocator_ptr ptr);
 
+/**
+ * @brief Return a real pointer to data. Fast and may cause an segfault or other memory errors
+ * @warning You don't own this pointer
+ *
+ * @api
+ */
+void* chunk_memory_allocator_get_real_ptr_unsafe(ChunkMemoryAllocator* this, chunk_allocator_ptr ptr);
 
 /* ======================> Iterator <====================== */
 
