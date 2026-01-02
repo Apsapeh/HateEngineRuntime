@@ -18,6 +18,18 @@ RenderContextSurface* g_surface2;
 PUBLIC void _ready(void) {
     vfs_mount_rfs("/");
     input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
+    input_event_connect(&event_callback);
 
     printf("wscw: %p\n", (void*) raw_platform_driver_create_window);
     printf("wswss: %p\n", (void*) raw_platform_driver_window_set_size);

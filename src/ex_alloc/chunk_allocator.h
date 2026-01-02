@@ -37,6 +37,7 @@ typedef struct ChunkMemoryAllocator {
     u8 minimal_chunks_count;
 } ChunkMemoryAllocator;
 
+
 /**
  *
  */
@@ -94,3 +95,80 @@ boolean chunk_memory_allocator_free_mem(ChunkMemoryAllocator* this, chunk_alloca
  * @api
  */
 void* chunk_memory_allocator_get_real_ptr(ChunkMemoryAllocator* this, chunk_allocator_ptr ptr);
+
+
+/* ======================> Iterator <====================== */
+
+/**
+ * @brief Iterator over all allocated memory
+ *
+ * @api
+ */
+typedef struct ChunkMemoryAllocatorIter {
+    u8 meta; // 1 << 0 - is last, 1 << 1 is empty
+    u8 bit_idx;
+    u32 chunk_idx;
+    u32 byte_idx;
+    ChunkMemoryAllocator* cma;
+    void* ptr;
+} ChunkMemoryAllocatorIter;
+
+boolean chunk_memory_allocator_iter_constructor(
+        ChunkMemoryAllocatorIter* self, ChunkMemoryAllocator* cma
+);
+boolean chunk_memory_allocator_iter_destructor(ChunkMemoryAllocatorIter* self);
+
+/**
+ * @brief Create new Iterator over all allocated memory
+ *
+ * @error "InvalidArgument"
+ * @error "AllocationFailed"
+ * @api
+ */
+ChunkMemoryAllocatorIter* chunk_memory_allocator_iter_new(ChunkMemoryAllocator* cma);
+
+/**
+ * @brief Free Iterator. Use only with "chunk_memory_allocator_iter_new"
+ *
+ * @error "InvalidArgument"
+ * @api
+ */
+boolean chunk_memory_allocator_iter_free(ChunkMemoryAllocatorIter* self);
+
+/**
+ * @brief Next element
+ *
+ * @param real_ptr Pointer to real data. Can be NULL
+ *
+ * @return true if next element is exist, false if is not (is the last element)
+ *
+ * @error "InvalidArgument"
+ * @api
+ */
+boolean chunk_memory_allocator_iter_next(ChunkMemoryAllocatorIter* self, void** real_ptr);
+
+/**
+ * @brief Return a real pointer to data
+ * @warning You to owned this pointer
+ *
+ * @error "InvalidArgument"
+ * @api
+ */
+void* chunk_memory_allocator_iter_get_real_ptr(ChunkMemoryAllocatorIter* self);
+
+/**
+ * @brief Is the begin
+ *
+ * @error "InvalidArgument"
+ * @api
+ */
+boolean chunk_memory_allocator_iter_is_begin(ChunkMemoryAllocatorIter* self);
+
+
+/**
+ * @brief Is the end
+ *
+ * @error "InvalidArgument"
+ * @api
+ */
+boolean chunk_memory_allocator_iter_is_end(ChunkMemoryAllocatorIter* self);

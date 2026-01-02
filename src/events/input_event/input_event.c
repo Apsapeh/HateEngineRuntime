@@ -7,6 +7,7 @@
 #include "input/mouse.h"
 #include "log.h"
 #include "math/vec2.h"
+#include "platform/mutex.h"
 
 #ifdef HE_DEBUG
     #define EVENT_TYPE_CHECK(event, event_type, function_name, end_block)                               \
@@ -26,13 +27,16 @@
 
 
 static ChunkMemoryAllocator g_connectedFunctions;
+static mutex_handle g_connectedFunctionsMutex;
 
 void input_event_init(void) {
-    chunk_memory_allocator_constructor(&g_connectedFunctions, sizeof(InputEventCallbackFunc), 16, 4);
+    chunk_memory_allocator_constructor(&g_connectedFunctions, sizeof(InputEventCallbackFunc), 64, 4);
+    g_connectedFunctionsMutex = mutex_new();
 }
 
 void input_event_exit(void) {
     chunk_memory_allocator_destructor(&g_connectedFunctions);
+    mutex_free(g_connectedFunctionsMutex);
 }
 
 
@@ -96,6 +100,42 @@ InputEventType input_event_get_type(InputEvent* event) {
 boolean input_event_emit(const InputEvent* event) {
     ERROR_ARGS_CHECK_1(event, { return false; });
 
+    InputEventCallbackFunc f;
+
+    // TODO: change to normal iterator
+    mutex_lock(g_connectedFunctionsMutex);
+    // for (usize byte_idx = 0; byte_idx < g_connectedFunctions.chunks_bitfield.size; ++byte_idx) {
+    //     u8 byte = g_connectedFunctions.chunks_bitfield.data[byte_idx];
+    //     if (byte == 0)
+    //         continue;
+    //
+    //     for (usize bit_idx = 0; bit_idx < 8; ++bit_idx) {
+    //         u8 mask = 1 << bit_idx;
+    //         boolean bit = byte & mask;
+    //
+    //         if (!bit)
+    //             continue;
+    //
+    //         usize chunk_idx = byte_idx / g_connectedFunctions.chunk_bitfield_size;
+    //         u8* chunk = (u8*) g_connectedFunctions.chunks.data[chunk_idx];
+    //         usize el_idx = ((byte_idx % g_connectedFunctions.chunk_bitfield_size) >> 3) + bit_idx;
+    //         InputEventCallbackFunc* function =
+    //                 (InputEventCallbackFunc*) (chunk + g_connectedFunctions.element_size * el_idx);
+    //
+    //         LOG_INFO("%d, %p, %d, %p", chunk_idx, chunk, el_idx, function);
+    //
+    //         (*function)(event);
+    //     }
+    // }
+    ChunkMemoryAllocatorIter iter;
+    InputEventCallbackFunc* function;
+    chunk_memory_allocator_iter_constructor(&iter, &g_connectedFunctions);
+    while (chunk_memory_allocator_iter_next(&iter, (void**) &function)) {
+        (*function)(event);
+    }
+
+    mutex_unlock(g_connectedFunctionsMutex);
+
 
     if (event->type == INPUT_EVENT_TYPE_KEY) {
         LOG_INFO(
@@ -122,10 +162,28 @@ boolean input_event_emit(const InputEvent* event) {
 
 InputEventCallbackHandler input_event_connect(InputEventCallbackFunc func) {
     ERROR_ARGS_CHECK_1(func, { return 0; });
+    mutex_lock(g_connectedFunctionsMutex);
+    chunk_allocator_ptr ptr = chunk_memory_allocator_alloc_mem(&g_connectedFunctions);
+    mutex_unlock(g_connectedFunctionsMutex);
+    if (!ptr) {
+        LOG_ERROR_OR_DEBUG_FATAL(
+                "input_event_connoct: CallbackFunction can't be added, memory allocation error"
+        );
+        return ptr;
+    }
+
+    // TODO: change
+    InputEventCallbackFunc* f = chunk_memory_allocator_get_real_ptr(&g_connectedFunctions, ptr);
+    *f = func;
+    return ptr;
 }
 
 
-boolean input_event_disconnect(InputEventCallbackHandler) {
+boolean input_event_disconnect(InputEventCallbackHandler ptr) {
+    ERROR_ARGS_CHECK_1(ptr, { return false; });
+    mutex_lock(g_connectedFunctionsMutex);
+    return chunk_memory_allocator_free_mem(&g_connectedFunctions, ptr);
+    mutex_unlock(g_connectedFunctionsMutex);
 }
 
 
