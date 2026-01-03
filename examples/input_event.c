@@ -7,7 +7,7 @@
 #include <stdlib.h>
 
 static void event_callback(const InputEvent* const event) {
-    printf("New event\n");
+    //    printf("New event\n");
 }
 
 PlatformDriverWindow* g_win;
@@ -17,18 +17,6 @@ PlatformDriverWindow* g_win2;
 RenderContextSurface* g_surface2;
 PUBLIC void _ready(void) {
     vfs_mount_rfs("/");
-    input_event_connect(&event_callback);
-    input_event_connect(&event_callback);
-    input_event_connect(&event_callback);
-    input_event_connect(&event_callback);
-    input_event_connect(&event_callback);
-    input_event_connect(&event_callback);
-    input_event_connect(&event_callback);
-    input_event_connect(&event_callback);
-    input_event_connect(&event_callback);
-    input_event_connect(&event_callback);
-    input_event_connect(&event_callback);
-    input_event_connect(&event_callback);
     input_event_connect(&event_callback);
 
     printf("wscw: %p\n", (void*) raw_platform_driver_create_window);
@@ -46,17 +34,6 @@ PUBLIC void _ready(void) {
         exit(1);
     }
 
-    g_win2 = platform_driver_create_window("Hello2", IVEC2_NEW_M(800, 600), NULL);
-    if (!g_win2) {
-        printf("СМЭРТЬ: %s\n", get_error());
-        exit(1);
-    }
-
-    g_surface2 = render_context_create_surface(g_win2);
-    if (!g_surface2) {
-        printf("СМЭРТЬ: %s\n", get_error());
-        exit(1);
-    }
     // window_server_destroy_window(win);*/
 
     printf("Used mem: %zu\n", get_allocated_memory());
@@ -99,7 +76,13 @@ PUBLIC void _process(double delta) {
     g_count++;
 
     render_context_surface_present(g_surface);
-    render_context_surface_present(g_surface2);
+    //    render_context_surface_present(g_surface2);
+
+
+    if (input_key_is_pressed(KEY_W)) {
+        LOG_INFO("Pressed 'W'");
+        LOG_INFO("Memory used: %llu", get_allocated_memory());
+    }
 
     return;
 

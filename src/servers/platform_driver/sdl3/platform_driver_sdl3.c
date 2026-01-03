@@ -64,7 +64,6 @@ static boolean _poll_events(void) {
                 // Key up/down
                 case SDL_EVENT_KEY_UP:
                 case SDL_EVENT_KEY_DOWN:
-                    LOG_WARN("%c", g_event.key.key);
                     input_event_set_type(&g_inputEvent, INPUT_EVENT_TYPE_KEY);
                     input_event_key_set_key(&g_inputEvent, g_event.key.scancode);
                     input_event_key_set_is_pressed(&g_inputEvent, g_event.key.down);

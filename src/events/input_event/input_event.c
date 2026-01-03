@@ -100,33 +100,8 @@ InputEventType input_event_get_type(InputEvent* event) {
 boolean input_event_emit(const InputEvent* event) {
     ERROR_ARGS_CHECK_1(event, { return false; });
 
-    InputEventCallbackFunc f;
-
-    // TODO: change to normal iterator
     mutex_lock(g_connectedFunctionsMutex);
-    // for (usize byte_idx = 0; byte_idx < g_connectedFunctions.chunks_bitfield.size; ++byte_idx) {
-    //     u8 byte = g_connectedFunctions.chunks_bitfield.data[byte_idx];
-    //     if (byte == 0)
-    //         continue;
-    //
-    //     for (usize bit_idx = 0; bit_idx < 8; ++bit_idx) {
-    //         u8 mask = 1 << bit_idx;
-    //         boolean bit = byte & mask;
-    //
-    //         if (!bit)
-    //             continue;
-    //
-    //         usize chunk_idx = byte_idx / g_connectedFunctions.chunk_bitfield_size;
-    //         u8* chunk = (u8*) g_connectedFunctions.chunks.data[chunk_idx];
-    //         usize el_idx = ((byte_idx % g_connectedFunctions.chunk_bitfield_size) >> 3) + bit_idx;
-    //         InputEventCallbackFunc* function =
-    //                 (InputEventCallbackFunc*) (chunk + g_connectedFunctions.element_size * el_idx);
-    //
-    //         LOG_INFO("%d, %p, %d, %p", chunk_idx, chunk, el_idx, function);
-    //
-    //         (*function)(event);
-    //     }
-    // }
+
     ChunkMemoryAllocatorIter iter;
     InputEventCallbackFunc* function;
     chunk_memory_allocator_iter_constructor(&iter, &g_connectedFunctions);
@@ -136,36 +111,17 @@ boolean input_event_emit(const InputEvent* event) {
 
     mutex_unlock(g_connectedFunctionsMutex);
 
-
-    if (event->type == INPUT_EVENT_TYPE_KEY) {
-        LOG_INFO(
-                "Key: %d, IsPressed: %b, IsRepeat: %d", event->data.key.key, event->data.key.is_pressed,
-                event->data.key.is_repeat
-        );
-    } else if (event->type == INPUT_EVENT_TYPE_MOUSE_BUTTON) {
-        LOG_INFO(
-                "MouseButton: %d, IsPressed: %d, Clicks: %d, X: %f, Y: %f",
-                event->data.mouse_button.button, event->data.mouse_button.is_pressed,
-                event->data.mouse_button.clicks, event->data.mouse_button.coords.x,
-                event->data.mouse_button.coords.y
-        );
-    } else if (event->type == INPUT_EVENT_TYPE_MOUSE_MOTION) {
-        LOG_INFO(
-                "OffsetX: %f, OffsetY: %f, CoordX: %f, CoordY: %f", event->data.mouse_motion.offset.x,
-                event->data.mouse_motion.offset.y, event->data.mouse_motion.coords.x,
-                event->data.mouse_motion.coords.y
-        );
-    }
-
     return true;
 }
 
 InputEventCallbackHandler input_event_connect(InputEventCallbackFunc func) {
     ERROR_ARGS_CHECK_1(func, { return 0; });
+
     mutex_lock(g_connectedFunctionsMutex);
     InputEventCallbackFunc* f;
     chunk_allocator_ptr ptr = chunk_memory_allocator_alloc_mem(&g_connectedFunctions, (void**) &f);
     mutex_unlock(g_connectedFunctionsMutex);
+
     if (!ptr) {
         LOG_ERROR_OR_DEBUG_FATAL(
                 "input_event_connoct: CallbackFunction can't be added, memory allocation error"
@@ -180,9 +136,12 @@ InputEventCallbackHandler input_event_connect(InputEventCallbackFunc func) {
 
 boolean input_event_disconnect(InputEventCallbackHandler ptr) {
     ERROR_ARGS_CHECK_1(ptr, { return false; });
+
     mutex_lock(g_connectedFunctionsMutex);
-    return chunk_memory_allocator_free_mem(&g_connectedFunctions, ptr);
+    boolean st = chunk_memory_allocator_free_mem(&g_connectedFunctions, ptr);
     mutex_unlock(g_connectedFunctionsMutex);
+
+    return st;
 }
 
 

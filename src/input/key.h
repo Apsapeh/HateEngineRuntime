@@ -3,6 +3,8 @@
 
 #include <types/types.h>
 
+// MACROS API BEGIN
+
 // SDL3 based values
 // https://wiki.libsdl.org/SDL3/SDL_Scancode
 
@@ -388,6 +390,10 @@
                 of the display. */
 #define KEY_CALL 289 /**< Used for accepting phone calls. */
 #define KEY_ENDCALL 290 /**< Used for rejecting phone calls. */
+
+
+// MACROS API END
+
 
 /* @} */ /* Mobile keys */
 
