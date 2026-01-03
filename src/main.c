@@ -3,6 +3,7 @@
 #include "SDL3/SDL_events.h"
 #include "SDL3/SDL_timer.h"
 #include "events/input_event/input_event.h"
+#include "input/input.h"
 #include "log.h"
 #include "platform/memory.h"
 
@@ -75,6 +76,7 @@ static void init(void) {
     uid_init();
     vfs_init();
     input_event_init();
+    input_init();
     platform_driver_init();
     render_context_init();
     render_server_init();
@@ -88,6 +90,7 @@ static void exit_init(void) {
     render_server_exit();
     render_context_exit();
     platform_driver_exit();
+    input_exit();
     input_event_exit();
     vfs_exit();
     uid_exit();

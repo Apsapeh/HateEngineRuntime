@@ -29,7 +29,9 @@ API ENUM {
 #define MOUSE_BUTTON_X2  5
 #define MOUSE_BUTTON_UNKNOWN 255
 #define MOUSE_BUTTON_FIRST MOUSE_BUTTON_LEFT
-#define MOUSE_BUTTON_LAST  MOUSE_BUTTON_RIGHT
+#define MOUSE_BUTTON_LAST  MOUSE_BUTTON_X2
+
+#define MOUSE_BUTTON_COUNT 6
 // clang-format on
 
 
@@ -40,9 +42,9 @@ API ENUM {
  *
  * 3 - Right mouse button
  *
- * 4 - X1 mouse button. I don't give a fuck what it is
+ * 4 - X1 mouse button. I don't give a fuck what is it
  *
- * 5 - X2 mouse button. I don't give a fuck what it is
+ * 5 - X2 mouse button. I don't give a fuck what is it
  *
  * @api
  */
