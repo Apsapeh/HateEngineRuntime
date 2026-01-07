@@ -7,7 +7,7 @@ api_fn_lookup_table_header_file = """
 #pragma once
 // clang-format off
 #define HE_MEM_NO_MACRO
-//#include <extra/full_trace.h>
+//#include <core/extra/full_trace.h>
 
 INCLUDES
 
@@ -67,7 +67,7 @@ def api_fn_lookup_table_generator(data: ParseResult):
     header_file = header_file + table + "\n"
     header_file += "// clang-format on\n"
 
-    with open("src/api_sym_lookup_table.h.gen", "w") as f:
+    with open("src/core/api_sym_lookup_table.h.gen", "w") as f:
         f.write(header_file)
 
 
@@ -101,7 +101,7 @@ def full_trace_header_generator(data: ParseResult):
 
     data = f"#pragma once\n{includes_str}\n{functions}"
 
-    with open("src/extra/full_trace.h", "w") as f:
+    with open("src/core/extra/full_trace.h", "w") as f:
         f.write(data)
 
 
@@ -135,5 +135,5 @@ def full_trace_impl_generator(data):
 
     data = f'#include <log.h>\n#include "full_trace.h"\n\n{functions}'
 
-    with open("src/extra/full_trace.c", "w") as f:
+    with open("src/core/extra/full_trace.c", "w") as f:
         f.write(data)
