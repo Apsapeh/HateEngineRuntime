@@ -267,8 +267,8 @@ def run(data: ParseResult):
         include_macros += include_file_macros(filename) + "\n"
 
     to_replace = (
-        ("INCLUDE_TYPES", include_file("src/types/types.h")),
-        ("INCLUDE_ERROR", include_file("src/error.h")),
+        ("INCLUDE_TYPES", include_file("src/core/types/types.h")),
+        ("INCLUDE_ERROR", include_file("src/core/error.h")),
         ("INCLUDE_MACROS", include_macros),
         ("TYPES", types),
         ("CT_FN_DECL", ""),
