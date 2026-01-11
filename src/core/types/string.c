@@ -418,13 +418,24 @@ StringSlice* string_slice_from_cstr(const char* c_str, const i64 size) {
     }
 }
 
-
-boolean string_slice_equals(StringSlice* str_sl_1, StringSlice* str_sl_2) {
+boolean string_slice_equals(const StringSlice* str_sl_1, const StringSlice* str_sl_2) {
     ERROR_ARGS_CHECK_2(str_sl_1, str_sl_2, { return false; });
     if (str_sl_1->len != str_sl_2->len)
         return false;
 
     return memcmp(str_sl_1->str, str_sl_2->str, str_sl_1->len) ? false : true;
+}
+
+boolean string_slice_equals_cstr(const StringSlice* str_sl_1, const char* c_str) {
+    ERROR_ARGS_CHECK_1(str_sl_1, { return false; });
+
+    StringSlice tmp_slice;
+    boolean status = string_slice_from_cstr_constructor(&tmp_slice, c_str, -1);
+    if (status) {
+        return string_slice_equals(str_sl_1, &tmp_slice);
+    } else {
+        return false;
+    }
 }
 
 boolean string_slice_free(StringSlice* self) {

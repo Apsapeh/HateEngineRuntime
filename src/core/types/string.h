@@ -292,7 +292,17 @@ StringSlice* string_slice_from_cstr(const char* c_str, const i64 size);
  * @error ERROR_INVALID_ARGUMENT
  * @api
  */
-boolean string_slice_equals(StringSlice* str_sl_1, StringSlice* str_sl_2);
+boolean string_slice_equals(const StringSlice* str_sl_1, const StringSlice* str_sl_2);
+
+/**
+ * @brief check an equality between StringSlice and cstr. Just sugar
+ * @param str_sl_1 fisrt StringSlice
+ * @param str_sl_2 second cstr
+ *
+ * @error ERROR_INVALID_ARGUMENT
+ * @api
+ */
+boolean string_slice_equals_cstr(const StringSlice* str_sl_1, const char* c_str);
 
 /**
  * @brief free memory of passed StringSLice
