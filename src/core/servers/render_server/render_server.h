@@ -3,6 +3,7 @@
 #include <core/error.h>
 #include <core/types/types.h>
 #include <core/types/signal.h>
+#include <core/types/string.h>
 #include <core/math/ivec2.h>
 #include <core/math/mat3.h>
 #include <core/math/mat4.h>
@@ -75,7 +76,9 @@ API ENUM {
         "values": [
                 ["Vertex", 0],
                 ["Index", 1],
-                ["Normal", 2]
+                ["Normal", 2],
+                ["uv1", 3],
+                ["uv2", 4]
         ]
 }
 */
@@ -84,8 +87,10 @@ API ENUM {
 #define RENDER_SERVER_BUFFER_TYPE_VERTEX 0
 #define RENDER_SERVER_BUFFER_TYPE_INDEX 1
 #define RENDER_SERVER_BUFFER_TYPE_NORMAL 2
+#define RENDER_SERVER_BUFFER_TYPE_UV1 3
+#define RENDER_SERVER_BUFFER_TYPE_UV2 4
 #define RENDER_SERVER_BUFFER_TYPE_FIRST RENDER_SERVER_BUFFER_TYPE_VERTEX
-#define RENDER_SERVER_BUFFER_TYPE_LAST RENDER_SERVER_BUFFER_TYPE_NORMAL
+#define RENDER_SERVER_BUFFER_TYPE_LAST RENDER_SERVER_BUFFER_TYPE_UV2
 // clang-format on
 
 /**
@@ -220,6 +225,12 @@ typedef chunk_allocator_ptr RenderServerBufferHandle;
 typedef chunk_allocator_ptr RenderServerMaterialHandle;
 
 /**
+ * @api
+ */
+typedef chunk_allocator_ptr RenderServerShaderHandle;
+
+
+/**
  * @brief
  *
  * @api
@@ -259,14 +270,6 @@ typedef struct {
     boolean (*viewport_set_size)(RenderServerViewport* viewport, const IVec2* const size);
     boolean (*viewport_destroy)(RenderServerViewport* viewport);
 
-    // Матрица вида
-    //      уснановить нормальную матрицу
-    //      пересчитать матрицу по нормальной матрице вращения и по нормальной позиции
-    //
-    // Матрица проекции
-    //      установить напрямую
-    //      пересчитать проекцию по параметрам
-    //      пересчитать ортогональную проекцию по параметрам
     RenderServerCamera* (*camera_create)(void);
     boolean (*camera_projection_set)(RenderServerCamera* camera, const Mat4* const matrix);
     boolean (*camera_view_set)(RenderServerCamera* camera, const Mat4* const matrix);
@@ -296,14 +299,9 @@ typedef struct {
 
     // Mesh
     RenderServerMeshHandle (*mesh_create)(void);
-    /**
-     * @param type contains only float types 'fd'
-     */
-    boolean (*mesh_set_vertices_buffer)(RenderServerMeshHandle ptr, RenderServerBufferHandle buffer);
-    /**
-     * @param type contains only integer types 'bsiBSI'
-     */
-    boolean (*mesh_set_indices_buffer)(RenderServerMeshHandle ptr, RenderServerBufferHandle buffer);
+    boolean (*mesh_set_buffer)(
+            RenderServerMeshHandle ptr, RenderServerBufferType target, RenderServerBufferHandle buffer
+    );
     boolean (*mesh_destroy)(RenderServerMeshHandle ptr);
 
     // Buffer
@@ -317,11 +315,16 @@ typedef struct {
     boolean (*buffer_destroy)(RenderServerBufferHandle ptr);
 
     // Material
-    RenderServerMaterialHandle (*material_create)(void);
-    boolean (*material_set_albedo_texture)(
-            RenderServerMaterialHandle ptr, RenderServerTextureHandle texture_rid
+    RenderServerMaterialHandle (*material_create)(RenderServerShaderHandle shader);
+    boolean (*material_set_param)(RenderServerMaterialHandle ptr, const char* name, void* value);
+    boolean (*material_get_params)(
+            RenderServerMaterialHandle ptr, const char* const* names, const char* const* descrs
     );
     boolean (*material_destroy)(RenderServerMaterialHandle ptr);
+
+    // Shader
+    RenderServerShaderHandle (*shader_create)(const StringSlice* code);
+    boolean (*shader_destroy)(RenderServerShaderHandle ptr);
 
     // Texture
     RenderServerTextureHandle (*texture_create)(void);

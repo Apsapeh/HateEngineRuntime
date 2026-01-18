@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include <core/servers/render_server/methods-signatures.h.gen>
+#include "core/types/string.h"
 
 #define GLAD_GL_IMPLEMENTATION
 #include <glad_ogl13/gl.h>
@@ -26,6 +27,9 @@
 
 #define BUFFERS_CHUNK_SIZE 512
 #define BUFFERS_CHUNKS_COUNT 4
+
+#define MATERIALS_CHUNK_SIZE 128
+#define MATERIALS_CHUNKS_COUNT 4
 
 #ifdef HE_DEBUG
     #define CMA_PTR(cma, hdl) chunk_memory_allocator_get_real_ptr(cma, hdl);
@@ -89,14 +93,21 @@ struct Instance {
 struct Mesh {
     usize vertices_buf; // RenderServerBufferHandle
     usize indices_buf; // RenderServerBufferHandle
+    usize normals_buf; // RenderServerBufferHandle
+    usize uv1_buf; // RenderServerBufferHandle
+    usize uv2_buf; // RenderServerBufferHandle
 };
 
 struct Buffer {
-    void* ptr;
-    u64 size;
     RenderServerBufferType buffer_type; // Vertex, Index, Normal, etc.
     RenderServerDataType data_type; // Float, Int, etc.
     RenderServerDataOwnMode own_mode; // Copy, Borrow, Ptr
+    void* ptr;
+    usize size;
+};
+
+struct Material {
+    usize albedo_texture; // RenderServerTextureHandle
 };
 
 /* =========================================================================== */
@@ -112,6 +123,9 @@ static ChunkMemoryAllocator g_meshes;
 
 /***** Buffer *****/
 static ChunkMemoryAllocator g_buffers;
+
+/***** Material *****/
+static ChunkMemoryAllocator g_materials;
 
 /* ============================================================================ */
 
@@ -138,6 +152,7 @@ static boolean _init(void) {
     INIT_SUBSYSTEM_VARS(g_instances, struct Instance, INSTANCES_CHUNK_SIZE, INSTANCES_CHUNKS_COUNT);
     INIT_SUBSYSTEM_VARS(g_meshes, struct Mesh, MESHES_CHUNK_SIZE, MESHES_CHUNKS_COUNT);
     INIT_SUBSYSTEM_VARS(g_buffers, struct Buffer, BUFFERS_CHUNK_SIZE, BUFFERS_CHUNKS_COUNT);
+    INIT_SUBSYSTEM_VARS(g_materials, struct Material, MATERIALS_CHUNK_SIZE, MATERIALS_CHUNKS_COUNT);
 
     return true;
 }
@@ -150,6 +165,7 @@ static boolean _quit(void) {
     QUIT_SUBSYSTEM_VARS(g_instances);
     QUIT_SUBSYSTEM_VARS(g_meshes);
     QUIT_SUBSYSTEM_VARS(g_buffers);
+    QUIT_SUBSYSTEM_VARS(g_materials);
 
     return true;
 }
@@ -262,10 +278,6 @@ static boolean _draw(double delta) {
             glDisableClientState(GL_COLOR_ARRAY);
             glDisable(GL_DEPTH_TEST);
             glDisable(GL_SCISSOR_TEST);
-
-            if (task->viewport->type == ViewportTypeSurface) {
-                // RenderContext.surface_present(task->viewport->data.surface.surface);
-            }
         }
     }
 
@@ -445,11 +457,11 @@ static boolean world_destroy(RenderServerWorld* world) {
 static RenderServerInstanceHandle instance_create(void) {
     struct Instance* ptr = NULL;
     RenderServerInstanceHandle h = chunk_memory_allocator_alloc_mem(&g_instances, (void**) &ptr);
-    if (h) {
-        ptr->material = 0;
-        ptr->mesh = 0;
-        ptr->transform = MAT4_ONE_M;
-    }
+    ERROR_ALLOC_CHECK(h, {return 0});
+
+    ptr->material = 0;
+    ptr->mesh = 0;
+    ptr->transform = MAT4_ONE_M;
     return h;
 }
 
@@ -503,33 +515,46 @@ static boolean instance_destroy(RenderServerInstanceHandle instance) {
 static RenderServerMeshHandle mesh_create(void) {
     struct Mesh* ptr = NULL;
     RenderServerMeshHandle h = chunk_memory_allocator_alloc_mem(&g_meshes, (void**) &ptr);
-    if (h) {
-        ptr->indices_buf = 0;
-        ptr->vertices_buf = 0;
-    }
+    ERROR_ALLOC_CHECK(h, {return 0});
+
+    ptr->indices_buf = 0;
+    ptr->vertices_buf = 0;
+    ptr->normals_buf = 0;
+    ptr->uv1_buf = 0;
+    ptr->uv2_buf = 0;
+
     return h;
 }
 
-static boolean mesh_set_vertices_buffer(RenderServerMeshHandle hdl, RenderServerBufferHandle buffer) {
-    ERROR_ARGS_CHECK_2(hdl, buffer, { return false; });
+static boolean mesh_set_buffer(
+        RenderServerMeshHandle hdl, RenderServerBufferType target, RenderServerBufferHandle buffer
+) {
+    ERROR_ARGS_CHECK_1(hdl, { return false; });
+    ERROR_RANGE_CHECK(target, RENDER_SERVER_BUFFER_TYPE_FIRST, RENDER_SERVER_BUFFER_TYPE_LAST, {
+        return false;
+    });
 
     struct Mesh* ptr = chunk_memory_allocator_get_real_ptr(&g_meshes, hdl);
     if (!ptr)
         return false;
 
-    ptr->vertices_buf = buffer;
-
-    return true;
-}
-
-static boolean mesh_set_indices_buffer(RenderServerMeshHandle hdl, RenderServerBufferHandle buffer) {
-    ERROR_ARGS_CHECK_2(hdl, buffer, { return false; });
-
-    struct Mesh* ptr = chunk_memory_allocator_get_real_ptr(&g_meshes, hdl);
-    if (!ptr)
-        return false;
-
-    ptr->indices_buf = buffer;
+    switch (target) {
+        case RENDER_SERVER_BUFFER_TYPE_VERTEX:
+            ptr->vertices_buf = buffer;
+            break;
+        case RENDER_SERVER_BUFFER_TYPE_INDEX:
+            ptr->indices_buf = buffer;
+            break;
+        case RENDER_SERVER_BUFFER_TYPE_NORMAL:
+            ptr->normals_buf = buffer;
+            break;
+        case RENDER_SERVER_BUFFER_TYPE_UV1:
+            ptr->uv1_buf = buffer;
+            break;
+        case RENDER_SERVER_BUFFER_TYPE_UV2:
+            ptr->uv2_buf = buffer;
+            break;
+    }
 
     return true;
 }
@@ -558,12 +583,13 @@ static RenderServerBufferHandle buffer_create(
 
     struct Buffer* ptr = NULL;
     RenderServerBufferHandle h = chunk_memory_allocator_alloc_mem(&g_buffers, (void**) &ptr);
-    if (h) {
-        ptr->ptr = NULL;
-        ptr->size = 0;
-        ptr->own_mode = RENDER_SERVER_DATA_OWN_MODE_PTR;
-        ptr->buffer_type = type;
-    }
+    ERROR_ALLOC_CHECK(h, {return 0});
+
+    ptr->ptr = NULL;
+    ptr->size = 0;
+    ptr->own_mode = RENDER_SERVER_DATA_OWN_MODE_PTR;
+    ptr->buffer_type = type;
+
     return h;
 }
 
@@ -642,7 +668,80 @@ static boolean buffer_destroy(RenderServerBufferHandle hdl) {
     return chunk_memory_allocator_free_mem(&g_buffers, hdl);
 }
 
-// static SignalCallback
+
+struct MaterialParamInfo {
+    const char* name;
+    const char* description;
+};
+
+
+static RenderServerMaterialHandle material_create(RenderServerShaderHandle shader) {
+    ERROR_ARGS_CHECK_1(shader, { return 0; });
+
+    struct Material* ptr = NULL;
+    RenderServerMaterialHandle h = chunk_memory_allocator_alloc_mem(&g_materials, (void**) &ptr);
+    ERROR_ALLOC_CHECK(h, {return 0});
+
+
+    return h;
+}
+
+/*
+ * Float
+ * Int
+ * UInt
+ * IVec2
+ * IVec3
+ * IVec4
+ */
+
+static boolean material_set_param(RenderServerMaterialHandle hdl, const char* name, void* value) {
+    ERROR_ARGS_CHECK_3(hdl, name, value, { return false; });
+
+    struct Material* ptr = chunk_memory_allocator_get_real_ptr(&g_materials, hdl);
+    if (!ptr) {
+        set_error(ERROR_NOT_FOUND);
+        return false;
+    }
+
+    if (!strcmp(name, "albedo_texture")) {
+        LOG_INFO("NEW MATERIAL");
+    } else {
+        LOG_ERROR_OR_DEBUG_FATAL("material_set_param: unknown param");
+        set_error(ERROR_NOT_FOUND);
+        return false;
+    }
+
+    return true;
+}
+
+static boolean material_destroy(RenderServerMaterialHandle ptr) {
+    ERROR_ARGS_CHECK_1(ptr, { return false; });
+    return chunk_memory_allocator_free_mem(&g_materials, ptr);
+}
+
+
+static RenderServerShaderHandle shader_create(const StringSlice* code) {
+    ERROR_ARGS_CHECK_1(code, { return false; });
+    /*
+     * Just placeholder
+     */
+    if (code != (void*) 1)
+        LOG_WARN(
+                "RenderServer(OpenGL 1.3)::shader_create is not supported (fixed pipeline). To avoid "
+                "this warn - pass 1 as function param"
+        )
+
+    return true;
+}
+
+static boolean shader_destroy(RenderServerShaderHandle ptr) {
+    ERROR_ARGS_CHECK_1(ptr, { return false; });
+    /*
+     * Just placeholder
+     */
+    return true;
+}
 
 
 #define REGISTER(fn) render_server_backend_set_function(backend, #fn, (void (*)(void)) fn)
@@ -686,13 +785,19 @@ void render_server_opengl_13_backend_register(void) {
     REGISTER(instance_set_transform);
 
     REGISTER(mesh_create);
-    REGISTER(mesh_set_vertices_buffer);
-    REGISTER(mesh_set_indices_buffer);
+    REGISTER(mesh_set_buffer);
     REGISTER(mesh_destroy);
 
     REGISTER(buffer_create);
     REGISTER(buffer_set_data);
     REGISTER(buffer_destroy);
+
+    REGISTER(material_create);
+    REGISTER(material_set_param);
+    REGISTER(material_destroy);
+
+    REGISTER(shader_create);
+    REGISTER(shader_destroy);
 
     render_server_register_backend("OpenGL 1.3", backend);
 }

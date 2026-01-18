@@ -125,9 +125,19 @@ PUBLIC void _ready(void) {
             indices_buffer, ID, sizeof(ID), RENDER_SERVER_DATA_TYPE_U32, RENDER_SERVER_DATA_OWN_MODE_PTR
     );
 
+
+    RenderServerShaderHandle shader = render_server_shader_create((const StringSlice*) 1);
+    ERROR_CATCH(shader);
+    RenderServerMaterialHandle material = render_server_material_create(shader);
+    ERROR_CATCH(material);
+
+    //    StringSlice* string = string_slice_from_cstr("albedo_texture", -1);
+    render_server_material_set_param(material, "albedo_texture", &material);
+
+
     RenderServerMeshHandle mesh = render_server_mesh_create();
-    render_server_mesh_set_vertices_buffer(mesh, vertices_buffer);
-    render_server_mesh_set_indices_buffer(mesh, indices_buffer);
+    render_server_mesh_set_buffer(mesh, RENDER_SERVER_BUFFER_TYPE_VERTEX, vertices_buffer);
+    render_server_mesh_set_buffer(mesh, RENDER_SERVER_BUFFER_TYPE_INDEX, indices_buffer);
 
     g_instance = render_server_instance_create();
     render_server_instance_set_mesh(g_instance, mesh);
