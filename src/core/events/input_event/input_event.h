@@ -7,39 +7,42 @@
 #include <core/ex_alloc/chunk_allocator.h>
 #include <core/math/vec2.h>
 
-
 /*
-API ENUM {
-        "name": "InputEventType",
-        "type": "u8",
-        "values": [
-                ["Key", 1],
-                ["MouseButton", 2],
-                ["MouseMotion", 3]
-        ]
-}
-*/
+u8 InputEventType
 
-// clang-format off
-#define INPUT_EVENT_TYPE_KEY   0
-#define INPUT_EVENT_TYPE_MOUSE_BUTTON  1
-#define INPUT_EVENT_TYPE_MOUSE_MOTION  2
-#define INPUT_EVENT_TYPE_UNKNOWN 255
-#define INPUT_EVENT_TYPE_FIRST INPUT_EVENT_TYPE_KEY
-#define INPUT_EVENT_TYPE_LAST  INPUT_EVENT_TYPE_MOUSE_MOTION
-// clang-format on
-
+Key
+MouseButton
+MouseMotion
+Count
+Unknown = 255
+ */
 
 /**
- * 0 - Keyboard key
- *
- * 1 - Mouse button
- *
- * 2 - Mouse motion
- *
+ * @api
+ */
+enum {
+    INPUT_EVENT_TYPE_KEY = 0,
+    INPUT_EVENT_TYPE_MOUSE_BUTTON = 1,
+    INPUT_EVENT_TYPE_MOUSE_MOTION = 2,
+    INPUT_EVENT_TYPE_COUNT = 3,
+    INPUT_EVENT_TYPE_UNKNOWN = 255,
+};
+
+/**
+ * 0 - Key
+
+ * 1 - MouseButton
+
+ * 2 - MouseMotion
+
+ * 3 - Count
+
+ * 255 - Unknown
+
  * @api
  */
 typedef u8 InputEventType;
+
 
 /**
  * @api

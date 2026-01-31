@@ -68,7 +68,7 @@ boolean input_event_free(InputEvent* event) {
 
 boolean input_event_set_type(InputEvent* event, InputEventType type) {
     ERROR_ARGS_CHECK_1(event, { return false; });
-    ERROR_RANGE_CHECK(type, INPUT_EVENT_TYPE_FIRST, INPUT_EVENT_TYPE_LAST, { return false; });
+    ERROR_RANGE_CHECK(type, 0, INPUT_EVENT_TYPE_COUNT, { return false; });
 
     event->type = type;
     switch (type) {
@@ -198,7 +198,7 @@ boolean input_event_mouse_button_set_button(InputEvent* event, MouseButton butto
     EVENT_TYPE_CHECK(event, INPUT_EVENT_TYPE_MOUSE_BUTTON, "input_event_mouse_button_set_button", {
         return false;
     });
-    ERROR_RANGE_CHECK(button, MOUSE_BUTTON_FIRST, MOUSE_BUTTON_LAST, { return false; });
+    ERROR_RANGE_CHECK(button, 0, MOUSE_BUTTON_COUNT, { return false; });
 
     event->data.mouse_button.button = button;
     return true;

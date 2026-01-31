@@ -4,64 +4,81 @@
 #include <core/types/types.h>
 #include <core/math/ivec2.h>
 
+/* ============> Window VSync <============ */
 /*
-API ENUM {
-        "name": "PlatformDriverWindowVSync",
-        "type": "char",
-        "values": [
-                ["Unknown", "'\\0'"],
-                ["Disabled", "'d'"],
-                ["Enabled", "'e'"],
-                ["EnabledAsync", "'a'"]
-        ]
-}
-*/
+u8 PlatformDriverWindowVsync
 
-#define PLATFORM_DRIVER_WINDOW_VSYNC_UNKNOWN '\0'
-#define PLATFORM_DRIVER_WINDOW_VSYNC_DISABLED 'd'
-#define PLATFORM_DRIVER_WINDOW_VSYNC_ENABLED 'e'
-#define PLATFORM_DRIVER_WINDOW_VSYNC_ENABLED_ASYNC 'a'
+Unknown
+Disabled
+Enabled
+EnabledAsync
+Count
+ */
 
 /**
- * 'd' - disabled
- *
- * 'e' - enabled
- *
- * 'a' - enabled async
- *
  * @api
  */
-typedef u8 PlatformDriverWindowVSync;
-
-
-/*
-API ENUM {
-        "name": "PlatformDriverWindowMode",
-        "type": "char",
-        "values": [
-                ["Unknown", "'\\0'"],
-                ["Windowed", "'w'"],
-                ["Fullscreen", "'f'"],
-                ["BorderlessFullscreen", "'b'"]
-        ]
-}
-*/
-
-#define PLATFORM_DRIVER_WINDOW_MODE_UNKNOWN '\0'
-#define PLATFORM_DRIVER_WINDOW_MODE_WINDOWED 'w'
-#define PLATFORM_DRIVER_WINDOW_MODE_FULLSCREEN 'f'
-#define PLATFORM_DRIVER_WINDOW_MODE_BORDERLESS_FULLSCREEN 'b'
+enum {
+    PLATFORM_DRIVER_WINDOW_VSYNC_UNKNOWN = 0,
+    PLATFORM_DRIVER_WINDOW_VSYNC_DISABLED = 1,
+    PLATFORM_DRIVER_WINDOW_VSYNC_ENABLED = 2,
+    PLATFORM_DRIVER_WINDOW_VSYNC_ENABLED_ASYNC = 3,
+    PLATFORM_DRIVER_WINDOW_VSYNC_COUNT = 4,
+};
 
 /**
- * 'w' - windowed
- *
- * 'f' - exclusive fullscreen
- *
- * 'b' - borderless fullscreen
- *
+ * 0 - Unknown
+
+ * 1 - Disabled
+
+ * 2 - Enabled
+
+ * 3 - EnabledAsync
+
+ * 4 - Count
+
+ * @api
+ */
+typedef u8 PlatformDriverWindowVsync;
+
+
+/* ============> Window Mode <============ */
+/*
+u8 PlatformDriverWindowMode
+
+Unknown
+Windowed
+Fullscreen
+BorderlessFullscreen
+Count
+ */
+
+/**
+ * @api
+ */
+enum {
+    PLATFORM_DRIVER_WINDOW_MODE_UNKNOWN = 0,
+    PLATFORM_DRIVER_WINDOW_MODE_WINDOWED = 1,
+    PLATFORM_DRIVER_WINDOW_MODE_FULLSCREEN = 2,
+    PLATFORM_DRIVER_WINDOW_MODE_BORDERLESS_FULLSCREEN = 3,
+    PLATFORM_DRIVER_WINDOW_MODE_COUNT = 4,
+};
+
+/**
+ * 0 - Unknown
+
+ * 1 - Windowed
+
+ * 2 - Fullscreen
+
+ * 3 - BorderlessFullscreen
+
+ * 4 - Count
+
  * @api
  */
 typedef u8 PlatformDriverWindowMode;
+
 
 /**
  * @brief

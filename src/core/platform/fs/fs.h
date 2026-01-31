@@ -7,31 +7,37 @@ typedef struct FSFileStream FSFileStream;
 
 
 /*
-API ENUM {
-        "name": "FSSeekFrom",
-        "type": "char",
-        "values": [
-                ["Start", "'s'"],
-                ["Current", "'c'"],
-                ["End", "'e'"]
-        ]
-}
-*/
+u8 FSSeekFrom
 
-#define FS_SEEK_FROM_START 's'
-#define FS_SEEK_FROM_CURRENT 'c'
-#define FS_SEEK_FROM_END 'e'
+Start
+Current
+End
+Count
+ */
 
 /**
- * 's' - Seek from start
- *
- * 'c' - Seek from current
- *
- * 'e' - Seek from end
- *
  * @api
  */
-typedef char FSSeekFrom;
+enum {
+    FS_SEEK_FROM_START = 0,
+    FS_SEEK_FROM_CURRENT = 1,
+    FS_SEEK_FROM_END = 2,
+    FS_SEEK_FROM_COUNT = 3,
+};
+
+/**
+ * 0 - Start
+
+ * 1 - Current
+
+ * 2 - End
+
+ * 3 - Count
+
+ * @api
+ */
+typedef u8 FSSeekFrom;
+
 
 /**
  * @brief Return path to directory containing the executable (in most OSes)

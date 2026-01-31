@@ -126,13 +126,12 @@ PUBLIC void _ready(void) {
     );
 
 
-    RenderServerShaderHandle shader = render_server_shader_create((const StringSlice*) 1);
-    ERROR_CATCH(shader);
-    RenderServerMaterialHandle material = render_server_material_create(shader);
+    RenderServerMaterialHandle material = render_server_material_create();
     ERROR_CATCH(material);
 
     //    StringSlice* string = string_slice_from_cstr("albedo_texture", -1);
-    render_server_material_set_param(material, "albedo_texture", &material);
+    //    render_server_material_set_param(material, "albedo_texture", &material);
+    render_server_material_set_albedo_texture(material, 0);
 
 
     RenderServerMeshHandle mesh = render_server_mesh_create();

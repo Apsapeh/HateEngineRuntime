@@ -151,13 +151,15 @@ class TypedefStructPointer(Struct):
 
 
 class ApiEnumValue:
-    def __init__(self, name: str, value: str):
+    def __init__(self, name: str, value: str, comment: str):
         self.name = name
         self.value = value
+        self.comment = comment
 
     def __iter__(self):
         yield "name", self.name
         yield "value", self.value
+        yield "comment", self.comment
 
 
 class ApiEnum:

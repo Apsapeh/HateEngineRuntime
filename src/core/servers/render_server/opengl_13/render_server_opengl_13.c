@@ -1,7 +1,7 @@
 #include "render_server_opengl_13.h"
 #include <core/ex_alloc/chunk_allocator.h>
 #include <core/math/ivec2.h>
-#include <core/math/mat4.h>
+
 #include <core/platform/memory.h>
 #include <core/servers/render_server/render_server.h>
 #include <core/error.h>
@@ -13,11 +13,14 @@
 #include <string.h>
 
 #include <core/servers/render_server/methods-signatures.h.gen>
-#include "core/types/string.h"
+#include "error.h"
 
 #define GLAD_GL_IMPLEMENTATION
 #include <glad_ogl13/gl.h>
 
+/* ====> Errors <==== */
+#define ANY_ERROR "OpenGLAnyError"
+/* ================== */
 
 #define INSTANCES_CHUNK_SIZE 128
 #define INSTANCES_CHUNKS_COUNT 4
@@ -30,6 +33,10 @@
 
 #define MATERIALS_CHUNK_SIZE 128
 #define MATERIALS_CHUNKS_COUNT 4
+
+#define TEXTURES_CHUNK_SIZE 128
+#define TEXTURES_CHUNKS_COUNT 4
+
 
 #ifdef HE_DEBUG
     #define CMA_PTR(cma, hdl) chunk_memory_allocator_get_real_ptr(cma, hdl);
@@ -110,6 +117,20 @@ struct Material {
     usize albedo_texture; // RenderServerTextureHandle
 };
 
+struct Texture {
+    boolean mipmap_is_enabled;
+    RenderServerDataType data_type;
+    RenderServerTextureFormat format;
+    RenderServerTextureFilter filter_min;
+    RenderServerTextureFilter filter_mag;
+    RenderServerTextureMipmapFilter mipmap_filter_min;
+    RenderServerTextureWrapMode wrap_s;
+    RenderServerTextureWrapMode wrap_t;
+    GLuint gl_tex_hdl;
+    const u8* data_ptr;
+    IVec2 dimensions;
+};
+
 /* =========================================================================== */
 
 
@@ -127,7 +148,69 @@ static ChunkMemoryAllocator g_buffers;
 /***** Material *****/
 static ChunkMemoryAllocator g_materials;
 
+/***** Texture *****/
+static ChunkMemoryAllocator g_textures;
+
+
 /* ============================================================================ */
+// clang-format off
+static const GLenum DATA_TYPE_MAP[RENDER_SERVER_DATA_TYPE_COUNT] = {
+        [RENDER_SERVER_DATA_TYPE_F32] = GL_FLOAT,
+        [RENDER_SERVER_DATA_TYPE_I8 ] = GL_BYTE,
+        [RENDER_SERVER_DATA_TYPE_I16] = GL_SHORT,
+        [RENDER_SERVER_DATA_TYPE_I32] = GL_INT,
+        [RENDER_SERVER_DATA_TYPE_U8 ] = GL_UNSIGNED_BYTE,
+        [RENDER_SERVER_DATA_TYPE_U16] = GL_UNSIGNED_SHORT,
+        [RENDER_SERVER_DATA_TYPE_U32] = GL_UNSIGNED_INT,
+};
+// clang-format on
+
+static const GLenum TEX_FORMAT_MAP[RENDER_SERVER_TEXTURE_FORMAT_COUNT] = {
+        [RENDER_SERVER_TEXTURE_FORMAT_RGB] = GL_RGB,
+        [RENDER_SERVER_TEXTURE_FORMAT_RGBA] = GL_RGBA,
+        [RENDER_SERVER_TEXTURE_FORMAT_BGR] = GL_BGR,
+        [RENDER_SERVER_TEXTURE_FORMAT_BGRA] = GL_BGRA,
+};
+
+static const GLenum TEX_FILTER_MAP[RENDER_SERVER_TEXTURE_FILTER_COUNT] = {
+        [RENDER_SERVER_TEXTURE_FILTER_NEAREST] = GL_NEAREST,
+        [RENDER_SERVER_TEXTURE_FILTER_LINEAR] = GL_LINEAR,
+};
+
+// clang-format off
+static const GLenum TEX_MIPMAP_FILTER_MAP[RENDER_SERVER_TEXTURE_FILTER_COUNT][RENDER_SERVER_TEXTURE_MIPMAP_FILTER_COUNT] = {
+    [RENDER_SERVER_TEXTURE_FILTER_NEAREST] = {
+        [RENDER_SERVER_TEXTURE_MIPMAP_FILTER_NEAREST] = GL_NEAREST_MIPMAP_NEAREST,
+        [RENDER_SERVER_TEXTURE_MIPMAP_FILTER_LINEAR] = GL_NEAREST_MIPMAP_LINEAR,
+    },
+    [RENDER_SERVER_TEXTURE_FILTER_LINEAR] = {
+        [RENDER_SERVER_TEXTURE_MIPMAP_FILTER_NEAREST] = GL_LINEAR_MIPMAP_NEAREST,
+        [RENDER_SERVER_TEXTURE_MIPMAP_FILTER_LINEAR] = GL_LINEAR_MIPMAP_LINEAR,
+    }
+};
+// clang-format on
+
+static const GLenum TEX_WRAP_MODE_MAP[RENDER_SERVER_TEXTURE_WRAP_MODE_COUNT] = {
+        [RENDER_SERVER_TEXTURE_WRAP_MODE_REPEAT] = GL_REPEAT,
+        [RENDER_SERVER_TEXTURE_WRAP_MODE_MIRRORED_REPEAT] = GL_REPEAT,
+        [RENDER_SERVER_TEXTURE_WRAP_MODE_CLAMP_TO_EDGE] = GL_CLAMP_TO_EDGE,
+};
+
+
+#define BACKEND_NAME "RenderServer(OpenGL 1.3)"
+#define METHOD_NAME ""
+#undef METHOD_NAME
+
+#define LOG_HEADER BACKEND_NAME "::" METHOD_NAME ":"
+
+#define CMA_CHECK_LOAD(type, cma, return_block)                                                         \
+    struct type* ptr = chunk_memory_allocator_get_real_ptr(&cma, hdl);                                  \
+    if (!ptr) {                                                                                         \
+        LOG_ERROR_OR_DEBUG_FATAL(LOG_HEADER #type " (%u) not found");                                   \
+        set_error(ERROR_NOT_FOUND);                                                                     \
+        return_block                                                                                    \
+    }
+
 
 static void init_glad_cb(void* args, void* ctx) {
     if (!gladLoadGL(RenderContext.get_proc_addr)) {
@@ -153,6 +236,7 @@ static boolean _init(void) {
     INIT_SUBSYSTEM_VARS(g_meshes, struct Mesh, MESHES_CHUNK_SIZE, MESHES_CHUNKS_COUNT);
     INIT_SUBSYSTEM_VARS(g_buffers, struct Buffer, BUFFERS_CHUNK_SIZE, BUFFERS_CHUNKS_COUNT);
     INIT_SUBSYSTEM_VARS(g_materials, struct Material, MATERIALS_CHUNK_SIZE, MATERIALS_CHUNKS_COUNT);
+    INIT_SUBSYSTEM_VARS(g_textures, struct Texture, TEXTURES_CHUNK_SIZE, TEXTURES_CHUNKS_COUNT);
 
     return true;
 }
@@ -166,6 +250,7 @@ static boolean _quit(void) {
     QUIT_SUBSYSTEM_VARS(g_meshes);
     QUIT_SUBSYSTEM_VARS(g_buffers);
     QUIT_SUBSYSTEM_VARS(g_materials);
+    QUIT_SUBSYSTEM_VARS(g_textures);
 
     return true;
 }
@@ -457,7 +542,7 @@ static boolean world_destroy(RenderServerWorld* world) {
 static RenderServerInstanceHandle instance_create(void) {
     struct Instance* ptr = NULL;
     RenderServerInstanceHandle h = chunk_memory_allocator_alloc_mem(&g_instances, (void**) &ptr);
-    ERROR_ALLOC_CHECK(h, {return 0});
+    ERROR_ALLOC_CHECK(h, { return 0; });
 
     ptr->material = 0;
     ptr->mesh = 0;
@@ -515,7 +600,7 @@ static boolean instance_destroy(RenderServerInstanceHandle instance) {
 static RenderServerMeshHandle mesh_create(void) {
     struct Mesh* ptr = NULL;
     RenderServerMeshHandle h = chunk_memory_allocator_alloc_mem(&g_meshes, (void**) &ptr);
-    ERROR_ALLOC_CHECK(h, {return 0});
+    ERROR_ALLOC_CHECK(h, { return 0; });
 
     ptr->indices_buf = 0;
     ptr->vertices_buf = 0;
@@ -530,9 +615,7 @@ static boolean mesh_set_buffer(
         RenderServerMeshHandle hdl, RenderServerBufferType target, RenderServerBufferHandle buffer
 ) {
     ERROR_ARGS_CHECK_1(hdl, { return false; });
-    ERROR_RANGE_CHECK(target, RENDER_SERVER_BUFFER_TYPE_FIRST, RENDER_SERVER_BUFFER_TYPE_LAST, {
-        return false;
-    });
+    ERROR_RANGE_CHECK(target, 0, RENDER_SERVER_BUFFER_TYPE_COUNT, { return false; });
 
     struct Mesh* ptr = chunk_memory_allocator_get_real_ptr(&g_meshes, hdl);
     if (!ptr)
@@ -565,25 +648,16 @@ static boolean mesh_destroy(RenderServerMeshHandle hdl) {
 }
 
 
+#define METHOD_NAME "buffer_create"
 static RenderServerBufferHandle buffer_create(
         RenderServerBufferType type, RenderServerBufferUsageHint usage_hint
 ) {
-    if (usage_hint < RENDER_SERVER_BUFFER_USAGE_HINT_FIRST ||
-        usage_hint > RENDER_SERVER_BUFFER_USAGE_HINT_LAST) {
-        LOG_ERROR_OR_DEBUG_FATAL("RenderServer::buffer_create: Unknown 'usage_hint' - %d", usage_hint);
-        set_error(ERROR_INVALID_ARGUMENT);
-        return false;
-    }
-
-    if (type < RENDER_SERVER_BUFFER_TYPE_FIRST || type > RENDER_SERVER_BUFFER_TYPE_LAST) {
-        LOG_ERROR_OR_DEBUG_FATAL("RenderServer::buffer_create: Unknown 'type' - %d", type);
-        set_error(ERROR_INVALID_ARGUMENT);
-        return false;
-    }
+    ERROR_RANGE_CHECK(usage_hint, 0, RENDER_SERVER_BUFFER_USAGE_HINT_COUNT, { return 0; });
+    ERROR_RANGE_CHECK(type, 0, RENDER_SERVER_BUFFER_TYPE_COUNT, { return 0; });
 
     struct Buffer* ptr = NULL;
     RenderServerBufferHandle h = chunk_memory_allocator_alloc_mem(&g_buffers, (void**) &ptr);
-    ERROR_ALLOC_CHECK(h, {return 0});
+    ERROR_ALLOC_CHECK(h, { return 0; });
 
     ptr->ptr = NULL;
     ptr->size = 0;
@@ -592,22 +666,16 @@ static RenderServerBufferHandle buffer_create(
 
     return h;
 }
+#undef METHOD_NAME
 
-
+#define METHOD_NAME "buffer_set_data"
 static boolean buffer_set_data(
         RenderServerBufferHandle hdl, const void* data, u64 data_size, RenderServerDataType data_type,
         RenderServerDataOwnMode data_own_mode
 ) {
     ERROR_ARGS_CHECK_3(hdl, data, data_size, { return false; });
-
-    if (data_own_mode < RENDER_SERVER_DATA_OWN_MODE_FIRST ||
-        data_own_mode > RENDER_SERVER_DATA_OWN_MODE_LAST) {
-        LOG_ERROR_OR_DEBUG_FATAL(
-                "RenderServer::buffer_set_data: Unknown 'data_own_mode' - %d", data_own_mode
-        );
-        set_error(ERROR_INVALID_ARGUMENT);
-        return false;
-    }
+    ERROR_RANGE_CHECK(data_type, 0, RENDER_SERVER_DATA_TYPE_COUNT, { return false; })
+    ERROR_RANGE_CHECK(data_own_mode, 0, RENDER_SERVER_DATA_OWN_MODE_COUNT, { return false; })
 
     // In OpenGL 1.x you don't have any GPU buffers, all data stored in the RAM.
     // You must send all your data to the GPU immediatly at an each frame
@@ -652,6 +720,7 @@ static boolean buffer_set_data(
     ptr->size = data_size;
     return true;
 }
+#undef METHOD_NAME
 
 static boolean buffer_destroy(RenderServerBufferHandle hdl) {
     ERROR_ARGS_CHECK_1(hdl, { return false; });
@@ -669,80 +738,200 @@ static boolean buffer_destroy(RenderServerBufferHandle hdl) {
 }
 
 
-struct MaterialParamInfo {
-    const char* name;
-    const char* description;
-};
-
-
-static RenderServerMaterialHandle material_create(RenderServerShaderHandle shader) {
-    ERROR_ARGS_CHECK_1(shader, { return 0; });
-
+static RenderServerMaterialHandle material_create(void) {
     struct Material* ptr = NULL;
     RenderServerMaterialHandle h = chunk_memory_allocator_alloc_mem(&g_materials, (void**) &ptr);
-    ERROR_ALLOC_CHECK(h, {return 0});
+    ERROR_ALLOC_CHECK(h, { return 0; });
 
-
+    ptr->albedo_texture = 0;
     return h;
 }
 
-/*
- * Float
- * Int
- * UInt
- * IVec2
- * IVec3
- * IVec4
- */
+#define METHOD_NAME "material_set_albedo_texture"
+static boolean material_set_albedo_texture(
+        RenderServerMaterialHandle hdl, RenderServerTextureHandle tex
+) {
+    // We are checks only hdl, so tex can be nulled
+    ERROR_ARGS_CHECK_1(hdl, { return false; });
+    CMA_CHECK_LOAD(Material, g_materials, { return false; });
 
-static boolean material_set_param(RenderServerMaterialHandle hdl, const char* name, void* value) {
-    ERROR_ARGS_CHECK_3(hdl, name, value, { return false; });
-
-    struct Material* ptr = chunk_memory_allocator_get_real_ptr(&g_materials, hdl);
-    if (!ptr) {
-        set_error(ERROR_NOT_FOUND);
-        return false;
-    }
-
-    if (!strcmp(name, "albedo_texture")) {
-        LOG_INFO("NEW MATERIAL");
-    } else {
-        LOG_ERROR_OR_DEBUG_FATAL("material_set_param: unknown param");
-        set_error(ERROR_NOT_FOUND);
-        return false;
-    }
+    ptr->albedo_texture = tex;
 
     return true;
 }
+#undef METHOD_NAME
 
 static boolean material_destroy(RenderServerMaterialHandle ptr) {
     ERROR_ARGS_CHECK_1(ptr, { return false; });
     return chunk_memory_allocator_free_mem(&g_materials, ptr);
 }
 
+#define METHOD_NAME "texture_create"
+static RenderServerTextureHandle texture_create(void) {
+    struct Texture* ptr = NULL;
+    RenderServerMaterialHandle h = chunk_memory_allocator_alloc_mem(&g_textures, (void**) &ptr);
+    ERROR_ALLOC_CHECK(h, { return 0; });
 
-static RenderServerShaderHandle shader_create(const StringSlice* code) {
-    ERROR_ARGS_CHECK_1(code, { return false; });
-    /*
-     * Just placeholder
-     */
-    if (code != (void*) 1)
+    glGenTextures(1, &ptr->gl_tex_hdl);
+
+    if (ptr->gl_tex_hdl == 0) {
+        u32 code = glGetError();
+        LOG_ERROR_OR_DEBUG_FATAL(LOG_HEADER " glGenTextures is failed with OpenGL error: %u", code);
+        set_error(ANY_ERROR);
+        return 0;
+    }
+
+    ptr->data_ptr = NULL;
+    ptr->filter_min = RENDER_SERVER_TEXTURE_FILTER_LINEAR;
+    ptr->filter_mag = RENDER_SERVER_TEXTURE_FILTER_LINEAR;
+    ptr->mipmap_is_enabled = false;
+    ptr->mipmap_filter_min = RENDER_SERVER_TEXTURE_MIPMAP_FILTER_LINEAR;
+    ptr->wrap_s = RENDER_SERVER_TEXTURE_WRAP_MODE_REPEAT;
+    ptr->wrap_t = RENDER_SERVER_TEXTURE_WRAP_MODE_REPEAT;
+
+    return h;
+}
+#undef METHOD_NAME
+
+
+#define METHOD_NAME "texture_set_data"
+static boolean texture_set_data(
+        RenderServerTextureHandle hdl, RenderServerTextureFormat format, const IVec2* const dimensions,
+        RenderServerDataType data_type, const u8* const data
+) {
+    ERROR_ARGS_CHECK_3(hdl, data, dimensions, { return false; });
+    ERROR_ARGS_CHECK_2(dimensions->x, dimensions->y, { return false; });
+    ERROR_RANGE_CHECK(format, 0, RENDER_SERVER_TEXTURE_FORMAT_COUNT, { return false; });
+
+    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
+
+    ptr->data_ptr = data;
+    ptr->data_type = data_type;
+    ptr->dimensions = *dimensions;
+    ptr->format = format;
+
+    return true;
+}
+
+#undef METHOD_NAME
+
+
+#define METHOD_NAME "texture_set_filter"
+static boolean texture_set_filter(
+        RenderServerTextureHandle hdl, RenderServerTextureFilter min, RenderServerTextureFilter mag
+) {
+    ERROR_ARGS_CHECK_1(hdl, { return false; });
+    ERROR_RANGE_CHECK(min, 0, RENDER_SERVER_TEXTURE_FILTER_COUNT, { return false; });
+    ERROR_RANGE_CHECK(mag, 0, RENDER_SERVER_TEXTURE_FILTER_COUNT, { return false; });
+
+    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
+
+    ptr->filter_min = min;
+    ptr->filter_mag = mag;
+
+    return true;
+}
+#undef METHOD_NAME
+
+#define METHOD_NAME "texture_set_mipmap"
+static boolean texture_set_mipmap(
+        RenderServerTextureHandle hdl, boolean enable, RenderServerTextureMipmapFilter min
+) {
+    ERROR_ARGS_CHECK_1(hdl, { return false; });
+    ERROR_RANGE_CHECK(min, 0, RENDER_SERVER_TEXTURE_MIPMAP_FILTER_COUNT, { return false; });
+
+    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
+
+    ptr->mipmap_is_enabled = enable;
+    ptr->mipmap_filter_min = min;
+    return true;
+}
+#undef METHOD_NAME
+
+#define METHOD_NAME "texture_set_wrap"
+static boolean texture_set_wrap(
+        RenderServerTextureHandle hdl, RenderServerTextureWrapMode s, RenderServerTextureWrapMode t
+) {
+    ERROR_ARGS_CHECK_1(hdl, { return false; });
+    ERROR_RANGE_CHECK(s, 0, RENDER_SERVER_TEXTURE_WRAP_MODE_COUNT, { return false; });
+    ERROR_RANGE_CHECK(t, 0, RENDER_SERVER_TEXTURE_WRAP_MODE_COUNT, { return false; });
+
+    if (s == RENDER_SERVER_TEXTURE_WRAP_MODE_MIRRORED_REPEAT ||
+        t == RENDER_SERVER_TEXTURE_WRAP_MODE_MIRRORED_REPEAT) {
         LOG_WARN(
-                "RenderServer(OpenGL 1.3)::shader_create is not supported (fixed pipeline). To avoid "
-                "this warn - pass 1 as function param"
+                LOG_HEADER "'RENDER_SERVER_TEXTURE_WRAP_MODE_MIRRORED_REPEAT' doesn't supported in "
+                           "OpenGL 1.3. Required OpenGL >= 1.4. Will be used "
+                           "'RENDER_SERVER_TEXTURE_WRAP_MODE_REPEAT'"
         )
+    }
+
+    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
+
+    ptr->wrap_s = s;
+    ptr->wrap_t = t;
 
     return true;
 }
+#undef METHOD_NAME
 
-static boolean shader_destroy(RenderServerShaderHandle ptr) {
-    ERROR_ARGS_CHECK_1(ptr, { return false; });
-    /*
-     * Just placeholder
-     */
+
+#define METHOD_NAME "texture_update"
+static boolean texture_update(RenderServerTextureHandle hdl) {
+    ERROR_ARGS_CHECK_1(hdl, { return false; });
+
+    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
+
+    if (ptr->data_ptr == NULL) {
+        LOG_ERROR_OR_DEBUG_FATAL(
+                LOG_HEADER "Texture pointer is not setted. You must first call \"texture_set_data\"!"
+        )
+        set_error(ERROR_INVALID_STATE);
+        return false;
+    }
+
+    glBindTexture(GL_TEXTURE_2D, ptr->gl_tex_hdl);
+
+    // Filters
+    GLenum min_filter;
+    GLenum mag_filter;
+
+    if (ptr->mipmap_is_enabled)
+        min_filter = TEX_MIPMAP_FILTER_MAP[ptr->filter_min][ptr->mipmap_filter_min];
+    else
+        min_filter = TEX_FILTER_MAP[ptr->filter_min];
+
+    mag_filter = TEX_FILTER_MAP[ptr->filter_mag];
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
+
+    // Wrap
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, TEX_WRAP_MODE_MAP[ptr->wrap_s]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, TEX_WRAP_MODE_MAP[ptr->wrap_t]);
+
+    // Format
+    GLenum format = TEX_FORMAT_MAP[ptr->format];
+    GLenum data_type = DATA_TYPE_MAP[ptr->data_type];
+    glTexImage2D(
+            GL_TEXTURE_2D, 0, format, ptr->dimensions.x, ptr->dimensions.y, 0, format, data_type,
+            ptr->data_ptr
+    );
+
+    if (ptr->mipmap_is_enabled) {
+        // Gen mipmap via glu or extern library
+    }
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
     return true;
 }
+#undef METHOD_NAME
 
+
+static boolean texture_destroy(RenderServerTextureHandle hdl) {
+    ERROR_ARGS_CHECK_1(hdl, { return false; });
+    return chunk_memory_allocator_free_mem(&g_textures, hdl);
+}
 
 #define REGISTER(fn) render_server_backend_set_function(backend, #fn, (void (*)(void)) fn)
 
@@ -793,11 +982,15 @@ void render_server_opengl_13_backend_register(void) {
     REGISTER(buffer_destroy);
 
     REGISTER(material_create);
-    REGISTER(material_set_param);
+    REGISTER(material_set_albedo_texture);
     REGISTER(material_destroy);
 
-    REGISTER(shader_create);
-    REGISTER(shader_destroy);
+    REGISTER(texture_create);
+    REGISTER(texture_set_data);
+    REGISTER(texture_set_filter);
+    REGISTER(texture_set_mipmap);
+    REGISTER(texture_set_wrap);
+    REGISTER(texture_update);
 
     render_server_register_backend("OpenGL 1.3", backend);
 }

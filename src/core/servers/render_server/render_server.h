@@ -34,153 +34,324 @@
 typedef u8 RenderServerRenderTaskState;
 
 
-/*
-API ENUM {
-        "name": "RenderServerBufferUsageHint",
-        "type": "u8",
-        "values": [
-                ["Static", 0],
-                ["Dynamic", 1],
-                ["Stream", 2]
-        ]
-}
-*/
-
+/* ============> Buffer Usage Hint Enum <============ */
 // clang-format off
-#define RENDER_SERVER_BUFFER_USAGE_HINT_STATIC 0
-#define RENDER_SERVER_BUFFER_USAGE_HINT_DYNAMIC 1
-#define RENDER_SERVER_BUFFER_USAGE_HINT_STREAM 2
-#define RENDER_SERVER_BUFFER_USAGE_HINT_FIRST RENDER_SERVER_BUFFER_USAGE_HINT_STATIC
-#define RENDER_SERVER_BUFFER_USAGE_HINT_LAST RENDER_SERVER_BUFFER_USAGE_HINT_STREAM
+/*
+u8 RenderServerBufferUsageHint
+
+Static // Buffer will be set once and never changed. Use for static meshes like level, level environment, etc.
+Dynamic // Buffer will be sometimes change. Use for maybe minecraft-like chunks, idk
+Stream // Buffer will be changed every few frames.Use for particles
+Count
+ */
 // clang-format on
 
 /**
- * 0 - Buffer will be set once and never changed.
- *     Use for static meshes like level, level environment, etc.
- *
- * 1 - Buffer will be sometimes change
- *     Use for maybe minecraft-like chunks, idk
- *
- * 2 - Buffer will be changed every few frames
- *     Use for particles
- *
  * @api
  */
-typedef char RenderServerBufferUsageHint;
-
-
-/*
-API ENUM {
-        "name": "RenderServerBufferType",
-        "type": "u8",
-        "values": [
-                ["Vertex", 0],
-                ["Index", 1],
-                ["Normal", 2],
-                ["uv1", 3],
-                ["uv2", 4]
-        ]
-}
-*/
-
-// clang-format off
-#define RENDER_SERVER_BUFFER_TYPE_VERTEX 0
-#define RENDER_SERVER_BUFFER_TYPE_INDEX 1
-#define RENDER_SERVER_BUFFER_TYPE_NORMAL 2
-#define RENDER_SERVER_BUFFER_TYPE_UV1 3
-#define RENDER_SERVER_BUFFER_TYPE_UV2 4
-#define RENDER_SERVER_BUFFER_TYPE_FIRST RENDER_SERVER_BUFFER_TYPE_VERTEX
-#define RENDER_SERVER_BUFFER_TYPE_LAST RENDER_SERVER_BUFFER_TYPE_UV2
-// clang-format on
+enum {
+    // Buffer will be set once and never changed. Use for static meshes like level, level environment,
+    // etc.
+    RENDER_SERVER_BUFFER_USAGE_HINT_STATIC = 0,
+    // Buffer will be sometimes change. Use for maybe minecraft-like chunks, idk
+    RENDER_SERVER_BUFFER_USAGE_HINT_DYNAMIC = 1,
+    // Buffer will be changed every few frames.Use for particles
+    RENDER_SERVER_BUFFER_USAGE_HINT_STREAM = 2,
+    RENDER_SERVER_BUFFER_USAGE_HINT_COUNT = 3,
+};
 
 /**
- * 0 - Vertices. Float types
- *
- * 1 - Indices. Indeger types
- *
- * 2 - Normals. Float types. Must be normalized
- *
+ * 0 - Static: Buffer will be set once and never changed. Use for static meshes like level, level
+ environment, etc.
+
+ * 1 - Dynamic: Buffer will be sometimes change. Use for maybe minecraft-like chunks, idk
+
+ * 2 - Stream: Buffer will be changed every few frames.Use for particles
+
+ * 3 - Count
+
  * @api
  */
-typedef char RenderServerBufferType;
+typedef u8 RenderServerBufferUsageHint;
 
 
-/*
-API ENUM {
-        "name": "RenderServerDataType",
-        "type": "u8",
-        "values": [
-                ["F32", 0],
-                ["F64", 1],
-                ["I8",  2],
-                ["I16", 3],
-                ["I32", 4],
-                ["U8",  5],
-                ["U16", 6],
-                ["U32", 7]
-        ]
-}
-*/
-
+/* ============> Buffer Type Enum <============ */
 // clang-format off
-#define RENDER_SERVER_DATA_TYPE_F32 0
-#define RENDER_SERVER_DATA_TYPE_F64 1
-#define RENDER_SERVER_DATA_TYPE_I8  2
-#define RENDER_SERVER_DATA_TYPE_I16 3
-#define RENDER_SERVER_DATA_TYPE_I32 4
-#define RENDER_SERVER_DATA_TYPE_U8  5
-#define RENDER_SERVER_DATA_TYPE_U16 6
-#define RENDER_SERVER_DATA_TYPE_U32 7
-#define RENDER_SERVER_DATA_TYPE_FIRST RENDER_SERVER_DATA_TYPE_F32
-#define RENDER_SERVER_DATA_TYPE_LAST  RENDER_SERVER_DATA_TYPE_U32
+/*
+u8 RenderServerBufferType
+
+Vertex // Float types
+Index // Integer types
+Normal // Float types. Must be normalized
+UV1 
+UV2
+Count
+ */
 // clang-format on
 
 /**
- * 0 - f32, 4 bytes float point
- * 1 - f64, 8 bytes float point
- * 2 - i8,  1 byte signed integer
- * 3 - i16, 2 byte signed integer
- * 4 - i32, 4 byte signed integer
- * 5 - u8,  1 byte unsigned integer
- * 6 - u16, 2 byte unsigned integer
- * 7 - u32, 4 byte unsigned integer
- *
+ * @api
+ */
+enum {
+    // Float types
+    RENDER_SERVER_BUFFER_TYPE_VERTEX = 0,
+    // Integer types
+    RENDER_SERVER_BUFFER_TYPE_INDEX = 1,
+    // Float types. Must be normalized
+    RENDER_SERVER_BUFFER_TYPE_NORMAL = 2,
+    RENDER_SERVER_BUFFER_TYPE_UV1 = 3,
+    RENDER_SERVER_BUFFER_TYPE_UV2 = 4,
+    RENDER_SERVER_BUFFER_TYPE_COUNT = 5,
+};
+
+/**
+ * 0 - Vertex: Float types
+
+ * 1 - Index: Integer types
+
+ * 2 - Normal: Float types. Must be normalized
+
+ * 3 - UV1
+
+ * 4 - UV2
+
+ * 5 - Count
+
+ * @api
+ */
+typedef u8 RenderServerBufferType;
+
+
+/* ============> Texture Format Enum <============ */
+/*
+u8 RenderServerDataType
+
+F32  // 4 bytes float point
+I8   // 1 byte signed integer
+I16  // 2 byte signed integer
+I32  // 4 byte signed integer
+U8   // 1 byte unsigned integer
+U16  // 2 byte unsigned integer
+U32  // 4 byte unsigned integer
+Count
+ */
+
+
+/**
+ * @api
+ */
+enum {
+    // 4 bytes float point
+    RENDER_SERVER_DATA_TYPE_F32 = 0,
+    // 1 byte signed integer
+    RENDER_SERVER_DATA_TYPE_I8 = 1,
+    // 2 byte signed integer
+    RENDER_SERVER_DATA_TYPE_I16 = 2,
+    // 4 byte signed integer
+    RENDER_SERVER_DATA_TYPE_I32 = 3,
+    // 1 byte unsigned integer
+    RENDER_SERVER_DATA_TYPE_U8 = 4,
+    // 2 byte unsigned integer
+    RENDER_SERVER_DATA_TYPE_U16 = 5,
+    // 4 byte unsigned integer
+    RENDER_SERVER_DATA_TYPE_U32 = 6,
+    RENDER_SERVER_DATA_TYPE_COUNT = 7,
+};
+
+/**
+ * 0 - F32: 4 bytes float point
+
+ * 1 - I8: 1 byte signed integer
+
+ * 2 - I16: 2 byte signed integer
+
+ * 3 - I32: 4 byte signed integer
+
+ * 4 - U8: 1 byte unsigned integer
+
+ * 5 - U16: 2 byte unsigned integer
+
+ * 6 - U32: 4 byte unsigned integer
+
+ * 7 - Count
+
  * @api
  */
 typedef u8 RenderServerDataType;
 
 
-/*
-API ENUM {
-        "name": "RenderServerDataOwnMode",
-        "type": "u8",
-        "values": [
-                ["Copy", 0],
-                ["Borrow", 1],
-                ["Ptr", 2]
-        ]
-}
-*/
-
+/* ============> Texture Format Enum <============ */
 // clang-format off
-#define RENDER_SERVER_DATA_OWN_MODE_COPY   0
-#define RENDER_SERVER_DATA_OWN_MODE_BORROW 1
-#define RENDER_SERVER_DATA_OWN_MODE_PTR    2
-#define RENDER_SERVER_DATA_OWN_MODE_FIRST RENDER_SERVER_DATA_OWN_MODE_COPY
-#define RENDER_SERVER_DATA_OWN_MODE_LAST  RENDER_SERVER_DATA_OWN_MODE_PTR
+/*
+u8 RenderServerDataOwnMode
+
+Copy     // Data may be copied, may be not, depending on the backend implementation. RenderServer will own this data
+Borrow   // Data will be borrowed. RenderServer will own this data
+Ptr      // Data can be stored as a pointer without copying. Render server is not ownes data
+Count        
+*/
 // clang-format on
 
 /**
- * 0 - Data may be copied, may be not, depending on the backend implementation.
- * RenderServer will own this data
- *
- * 1 - Data will be borrowed. RenderServer will own this data
- *
- * 2 - Data can be stored as a pointer without copying. Render server is not ownes data
- *
+ * @api
+ */
+enum {
+    // Data may be copied, may be not, depending on the backend implementation. RenderServer will own
+    // this data
+    RENDER_SERVER_DATA_OWN_MODE_COPY = 0,
+    // Data will be borrowed. RenderServer will own this data
+    RENDER_SERVER_DATA_OWN_MODE_BORROW = 1,
+    // Data can be stored as a pointer without copying. Render server is not ownes data
+    RENDER_SERVER_DATA_OWN_MODE_PTR = 2,
+    RENDER_SERVER_DATA_OWN_MODE_COUNT = 3,
+};
+
+/**
+ * 0 - Copy: Data may be copied, may be not, depending on the backend implementation. RenderServer will
+ own this data
+
+ * 1 - Borrow: Data will be borrowed. RenderServer will own this data
+
+ * 2 - Ptr: Data can be stored as a pointer without copying. Render server is not ownes data
+
+ * 3 - Count
+
  * @api
  */
 typedef u8 RenderServerDataOwnMode;
+
+
+/* ============> Texture Format Enum <============ */
+/*
+u8 RenderServerTextureFormat
+
+RGB
+RGBA
+BGR
+BGRA
+Count
+ */
+
+/**
+ * @api
+ */
+enum {
+    RENDER_SERVER_TEXTURE_FORMAT_RGB = 0,
+    RENDER_SERVER_TEXTURE_FORMAT_RGBA = 1,
+    RENDER_SERVER_TEXTURE_FORMAT_BGR = 2,
+    RENDER_SERVER_TEXTURE_FORMAT_BGRA = 3,
+    RENDER_SERVER_TEXTURE_FORMAT_COUNT = 4,
+};
+
+/**
+ * 0 - RGB
+
+ * 1 - RGBA
+
+ * 2 - BGR
+
+ * 3 - BGRA
+
+ * 4 - Count
+
+ * @api
+ */
+typedef u8 RenderServerTextureFormat;
+
+
+/* ============> Texture Filter Enum <============ */
+/*
+u8 RenderServerTextureFilter
+
+Nearest
+Linear
+Count
+ */
+
+/**
+ * @api
+ */
+enum {
+    RENDER_SERVER_TEXTURE_FILTER_NEAREST = 0,
+    RENDER_SERVER_TEXTURE_FILTER_LINEAR = 1,
+    RENDER_SERVER_TEXTURE_FILTER_COUNT = 2,
+};
+
+/**
+ * 0 - Nearest
+
+ * 1 - Linear
+
+ * 2 - Count
+
+ * @api
+ */
+typedef u8 RenderServerTextureFilter;
+
+
+/* ============> Texture MipMap Filter Enum <============ */
+/*
+u8 RenderServerTextureMipmapFilter
+
+Nearest
+Linear
+Count
+ */
+
+/**
+ * @api
+ */
+enum {
+    RENDER_SERVER_TEXTURE_MIPMAP_FILTER_NEAREST = 0,
+    RENDER_SERVER_TEXTURE_MIPMAP_FILTER_LINEAR = 1,
+    RENDER_SERVER_TEXTURE_MIPMAP_FILTER_COUNT = 2,
+};
+
+/**
+ * 0 - Nearest
+
+ * 1 - Linear
+
+ * 2 - Count
+
+ * @api
+ */
+typedef u8 RenderServerTextureMipmapFilter;
+
+
+/* ============> Texture Wrap Mode Enum <============ */
+/*
+u8 RenderServerTextureWrapMode
+
+Repeat
+MirroredRepeat
+ClampToEdge
+Count
+ */
+
+/**
+ * @api
+ */
+enum {
+    RENDER_SERVER_TEXTURE_WRAP_MODE_REPEAT = 0,
+    RENDER_SERVER_TEXTURE_WRAP_MODE_MIRRORED_REPEAT = 1,
+    RENDER_SERVER_TEXTURE_WRAP_MODE_CLAMP_TO_EDGE = 2,
+    RENDER_SERVER_TEXTURE_WRAP_MODE_COUNT = 3,
+};
+
+/**
+ * 0 - Repeat
+
+ * 1 - MirroredRepeat
+
+ * 2 - ClampToEdge
+
+ * 3 - Count
+
+ * @api
+ */
+typedef u8 RenderServerTextureWrapMode;
+
 
 /**
  * @api
@@ -191,7 +362,6 @@ typedef struct RenderServerRenderTask RenderServerRenderTask;
  * @api
  */
 typedef struct RenderServerViewport RenderServerViewport;
-// typedef chunk_allocator_ptr RenderServerViewportHandle;
 
 /**
  * @api
@@ -202,7 +372,6 @@ typedef struct RenderServerCamera RenderServerCamera;
  * @api
  */
 typedef struct RenderServerWorld RenderServerWorld;
-// typedef chunk_allocator_ptr RenderServerWorldHandle;
 
 /**
  * @api
@@ -224,14 +393,11 @@ typedef chunk_allocator_ptr RenderServerBufferHandle;
  */
 typedef chunk_allocator_ptr RenderServerMaterialHandle;
 
-/**
- * @api
- */
-typedef chunk_allocator_ptr RenderServerShaderHandle;
-
 
 /**
  * @brief
+ *
+ * First you should configure texture params. After - call texture_update()
  *
  * @api
  */
@@ -300,39 +466,47 @@ typedef struct {
     // Mesh
     RenderServerMeshHandle (*mesh_create)(void);
     boolean (*mesh_set_buffer)(
-            RenderServerMeshHandle ptr, RenderServerBufferType target, RenderServerBufferHandle buffer
+            RenderServerMeshHandle hdl, RenderServerBufferType target, RenderServerBufferHandle buffer
     );
-    boolean (*mesh_destroy)(RenderServerMeshHandle ptr);
+    boolean (*mesh_destroy)(RenderServerMeshHandle hdl);
 
     // Buffer
     RenderServerBufferHandle (*buffer_create)(
             RenderServerBufferType type, RenderServerBufferUsageHint usage_hint
     );
     boolean (*buffer_set_data)(
-            RenderServerBufferHandle ptr, const void* data, u64 data_size_in_bytes,
+            RenderServerBufferHandle hdl, const void* data, u64 data_size_in_bytes,
             RenderServerDataType data_type, RenderServerDataOwnMode data_own_mode
     );
-    boolean (*buffer_destroy)(RenderServerBufferHandle ptr);
+    boolean (*buffer_destroy)(RenderServerBufferHandle hdl);
 
     // Material
-    RenderServerMaterialHandle (*material_create)(RenderServerShaderHandle shader);
-    boolean (*material_set_param)(RenderServerMaterialHandle ptr, const char* name, void* value);
-    boolean (*material_get_params)(
-            RenderServerMaterialHandle ptr, const char* const* names, const char* const* descrs
+    RenderServerMaterialHandle (*material_create)(void);
+    boolean (*material_set_albedo_texture)(
+            RenderServerMaterialHandle material, RenderServerTextureHandle texture
     );
-    boolean (*material_destroy)(RenderServerMaterialHandle ptr);
-
-    // Shader
-    RenderServerShaderHandle (*shader_create)(const StringSlice* code);
-    boolean (*shader_destroy)(RenderServerShaderHandle ptr);
+    boolean (*material_destroy)(RenderServerMaterialHandle hdl);
 
     // Texture
     RenderServerTextureHandle (*texture_create)(void);
+    /**
+     * @param data Pointer must be valid until texture_update is called
+     */
     boolean (*texture_set_data)(
-            RenderServerTextureHandle ptr, const u8* const data, IVec2 dimensions,
-            RenderServerDataOwnMode data_own_mode
+            RenderServerTextureHandle hdl, RenderServerTextureFormat format,
+            const IVec2* const dimensions, RenderServerDataType data_type, const u8* const data
     );
-    boolean (*texture_destroy)(RenderServerTextureHandle ptr);
+    boolean (*texture_set_filter)(
+            RenderServerTextureHandle hdl, RenderServerTextureFilter min, RenderServerTextureFilter mag
+    );
+    boolean (*texture_set_mipmap)(
+            RenderServerTextureHandle hdl, boolean enable, RenderServerTextureMipmapFilter min
+    );
+    boolean (*texture_set_wrap)(
+            RenderServerTextureHandle hdl, RenderServerTextureWrapMode s, RenderServerTextureWrapMode t
+    );
+    boolean (*texture_update)(RenderServerTextureHandle hdl);
+    boolean (*texture_destroy)(RenderServerTextureHandle hdl);
 
 } RenderServerBackend;
 

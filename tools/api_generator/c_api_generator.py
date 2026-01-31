@@ -141,10 +141,12 @@ def run(data: ParseResult):
         pass
 
     for enum in data.api_enums:
+        types += "enum {\n"
         for value in enum.values:
-            name = camel_to_upper_snake_case(enum.name + value.name)
-            types += f"#define {name} {value.value}\n\n"
-            pass
+            name = value.name
+            # types += f"#define {name} {value.value}\n\n"
+            types += f"    {name} = {value.value},\n"
+        types += "};\n"
 
     fn_ptrs_decl = ""
     fn_ptrs_impl = ""

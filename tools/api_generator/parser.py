@@ -1,3 +1,4 @@
+import sys
 import clang.cindex as cc
 from clang.cindex import CursorKind as CK
 from glob import glob
@@ -109,6 +110,11 @@ def parse_function_with_comments(cursor: cc.Cursor, filename: str):
         if s:
             result.extend(s)
         return result
+    elif cursor.kind == CK.ENUM_DECL:
+        s = parse_enum_decl(cursor)
+        if s:
+            result.extend(s)
+        return s
 
 
 def parse_function_decl(cursor: cc.Cursor, doc: str) -> Function:
@@ -408,6 +414,21 @@ def parse_typedef_decl(cursor: cc.Cursor) -> ParseResult:
     return result
 
 
+def parse_enum_decl(cursor: cc.Cursor) -> ParseResult:
+    result = ParseResult()
+    enum_name = cursor.spelling
+    children = list(cursor.get_children())
+
+    values = []
+    for child in children:
+        values.append(ApiEnumValue(str(child.spelling), str(child.enum_value), ""))
+
+    enum = ApiEnum("", "", values, str(cursor.location.file), int(cursor.location.line))
+    result.add_api_enum(enum)
+
+    return result
+
+
 def manual_parse(filename: str) -> ParseResult:
     result = ParseResult()
 
@@ -443,7 +464,7 @@ def manual_parse(filename: str) -> ParseResult:
                         f"Invalid api enum in {filename}, invalid value : {enum}"
                     )
 
-                r_values.append(ApiEnumValue(value[0], value[1]))
+                r_values.append(ApiEnumValue(value[0], value[1], ""))
 
             result.add_api_enum(ApiEnum(name, data_type, r_values, str(filename), 0))
 

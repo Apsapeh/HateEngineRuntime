@@ -48,7 +48,7 @@ def main(parse_result):
         for f in server.methods:
             pairs.append(f'{{"{f.name}", (FnT) &backend->{f.name}}}')
 
-            args = ", ".join([f"{arg._type}" for arg in f.args])
+            args = ", ".join([f"{arg._type} {arg.name}" for arg in f.args])
             if args == "":
                 args = "void"
             signatures += f"SIGNATURE_PREFIX {f.return_type} {f.name} ({args});\n"
