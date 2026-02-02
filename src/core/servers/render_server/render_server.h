@@ -490,6 +490,8 @@ typedef struct {
     // Texture
     RenderServerTextureHandle (*texture_create)(void);
     /**
+     * @param data_type Must be only u8 or f32 (RENDER_SERVER_DATA_TYPE_U8 or
+     * RENDER_SERVER_DATA_TYPE_F32)
      * @param data Pointer must be valid until texture_update is called
      */
     boolean (*texture_set_data)(

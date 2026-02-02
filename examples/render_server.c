@@ -80,7 +80,7 @@ PUBLIC void _ready(void) {
 
     // clang-format off
     // Вершины куба(координаты x, y, z)
-    float vertices[] = {
+    static const float vertices[] = {
             // Передняя грань
             -0.5f, -0.5f, 0.5f, // 0: нижний левый перед
              0.5f, -0.5f, 0.5f, // 1: нижний правый перед
@@ -95,7 +95,7 @@ PUBLIC void _ready(void) {
     };
 
     // Индексы для треугольников (по 2 треугольника на грань)
-    u32 indices[] = {
+    static const u32 indices[] = {
             // Передняя грань
             0, 1, 2, 2, 3, 0,
             // Задняя грань
@@ -109,37 +109,82 @@ PUBLIC void _ready(void) {
             // Левая грань
             4, 0, 3, 3, 7, 4
     };
+
+    static const float uv[] = {
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        1.0f, 1.0f,
+        0.0f, 1.0f,
+
+        0.0f, 0.0f,
+        1.0f, 0.0f,
+        1.0f, 1.0f,
+        0.0f, 1.0f
+    };
+
     // clang-format on
 
     RenderServerBufferHandle vertices_buffer = render_server_buffer_create(
             RENDER_SERVER_BUFFER_TYPE_VERTEX, RENDER_SERVER_BUFFER_USAGE_HINT_STATIC
     );
     render_server_buffer_set_data(
-            vertices_buffer, VD, sizeof(VD), RENDER_SERVER_DATA_TYPE_F32, RENDER_SERVER_DATA_OWN_MODE_PTR
+            vertices_buffer, vertices, sizeof(vertices), RENDER_SERVER_DATA_TYPE_F32,
+            RENDER_SERVER_DATA_OWN_MODE_PTR
     );
 
     RenderServerBufferHandle indices_buffer = render_server_buffer_create(
             RENDER_SERVER_BUFFER_TYPE_INDEX, RENDER_SERVER_BUFFER_USAGE_HINT_STATIC
     );
     render_server_buffer_set_data(
-            indices_buffer, ID, sizeof(ID), RENDER_SERVER_DATA_TYPE_U32, RENDER_SERVER_DATA_OWN_MODE_PTR
+            indices_buffer, indices, sizeof(indices), RENDER_SERVER_DATA_TYPE_U32,
+            RENDER_SERVER_DATA_OWN_MODE_PTR
     );
 
+    RenderServerBufferHandle uv_buffer = render_server_buffer_create(
+            RENDER_SERVER_BUFFER_TYPE_UV1, RENDER_SERVER_BUFFER_USAGE_HINT_STATIC
+    );
+    render_server_buffer_set_data(
+            uv_buffer, uv, sizeof(uv), RENDER_SERVER_DATA_TYPE_F32, RENDER_SERVER_DATA_OWN_MODE_PTR
+    );
+
+
+    // clang-format off
+    static const unsigned char chess_2x2_gray_rgb[] = {
+        240, 240, 240,    // светло-серый
+        60,  60,  60,    // тёмно-серый
+        60,  60,  60,
+        240, 240, 240
+    };
+    // clang-format on
+
+    RenderServerTextureHandle texture = render_server_texture_create();
+    ERROR_CATCH(texture);
+    IVec2 texture_dimensions = IVEC2_NEW_M(2, 2);
+    render_server_texture_set_data(
+            texture, RENDER_SERVER_TEXTURE_FORMAT_RGB, &texture_dimensions, RENDER_SERVER_DATA_TYPE_U8,
+            chess_2x2_gray_rgb
+    );
+    render_server_texture_set_filter(
+            texture, RENDER_SERVER_TEXTURE_FILTER_NEAREST, RENDER_SERVER_TEXTURE_FILTER_NEAREST
+    );
+    render_server_texture_update(texture);
 
     RenderServerMaterialHandle material = render_server_material_create();
     ERROR_CATCH(material);
 
     //    StringSlice* string = string_slice_from_cstr("albedo_texture", -1);
     //    render_server_material_set_param(material, "albedo_texture", &material);
-    render_server_material_set_albedo_texture(material, 0);
+    render_server_material_set_albedo_texture(material, texture);
 
 
     RenderServerMeshHandle mesh = render_server_mesh_create();
     render_server_mesh_set_buffer(mesh, RENDER_SERVER_BUFFER_TYPE_VERTEX, vertices_buffer);
     render_server_mesh_set_buffer(mesh, RENDER_SERVER_BUFFER_TYPE_INDEX, indices_buffer);
+    render_server_mesh_set_buffer(mesh, RENDER_SERVER_BUFFER_TYPE_UV1, uv_buffer);
 
     g_instance = render_server_instance_create();
     render_server_instance_set_mesh(g_instance, mesh);
+    render_server_instance_set_material(g_instance, material);
 
     render_server_world_add_instance(world, g_instance);
 
@@ -150,7 +195,9 @@ PUBLIC void _ready(void) {
 
 PUBLIC void _render(double delta) {
     // g_transform = mat4_apply_rotations(g_transform, delta * 0.1, delta * 0.05, 0);
-    mat4_rotate_in(&g_transform, 0.1, 0, 1, 0);
+    float speed = delta * 3;
+    mat4_rotate_in(&g_transform, 0.1 * speed, 0, 1, 0);
+    mat4_rotate_in(&g_transform, 0.07 * speed, 1, 0, 0);
     render_server_instance_set_transform(g_instance, &g_transform);
 
     // mat4_rotate_in(&g_cameraView, 0.03, 0, 1, 0);

@@ -1,5 +1,5 @@
 #include "render_server_opengl_13.h"
-#include <core/ex_alloc/chunk_allocator.h>
+
 #include <core/math/ivec2.h>
 
 #include <core/platform/memory.h>
@@ -14,6 +14,11 @@
 
 #include <core/servers/render_server/methods-signatures.h.gen>
 #include "error.h"
+
+
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#define STB_IMAGE_RESIZE_STATIC
+#include <stb/stb_image_resize2.h>
 
 #define GLAD_GL_IMPLEMENTATION
 #include <glad_ogl13/gl.h>
@@ -36,13 +41,6 @@
 
 #define TEXTURES_CHUNK_SIZE 128
 #define TEXTURES_CHUNKS_COUNT 4
-
-
-#ifdef HE_DEBUG
-    #define CMA_PTR(cma, hdl) chunk_memory_allocator_get_real_ptr(cma, hdl);
-#else
-    #define CMA_PTR(cma, hdl) chunk_memory_allocator_get_real_ptr_unsafe(cma, hdl);
-#endif
 
 
 /* ================================ Render Task ============================== */
@@ -137,6 +135,7 @@ struct Texture {
 /* ============================= Global Varibales ============================= */
 static boolean g_gladLoaded = false;
 
+/***** Instances *****/
 static ChunkMemoryAllocator g_instances;
 
 /***** Mesh *****/
@@ -165,12 +164,24 @@ static const GLenum DATA_TYPE_MAP[RENDER_SERVER_DATA_TYPE_COUNT] = {
 };
 // clang-format on
 
-static const GLenum TEX_FORMAT_MAP[RENDER_SERVER_TEXTURE_FORMAT_COUNT] = {
-        [RENDER_SERVER_TEXTURE_FORMAT_RGB] = GL_RGB,
-        [RENDER_SERVER_TEXTURE_FORMAT_RGBA] = GL_RGBA,
-        [RENDER_SERVER_TEXTURE_FORMAT_BGR] = GL_BGR,
-        [RENDER_SERVER_TEXTURE_FORMAT_BGRA] = GL_BGRA,
+struct TexFormatMapValue {
+    u8 size;
+    u8 stbir_format; // stbir_pixel_layout
+    GLenum gl_value;
 };
+#define TFMV_M(_size, _gl_val, _stbir_format)                                                           \
+    (struct TexFormatMapValue) {                                                                        \
+        .gl_value = _gl_val, .size = _size, .stbir_format = _stbir_format                               \
+    }
+
+static const struct TexFormatMapValue TEX_FORMAT_MAP[RENDER_SERVER_TEXTURE_FORMAT_COUNT] = {
+        [RENDER_SERVER_TEXTURE_FORMAT_RGB] = TFMV_M(3, GL_RGB, STBIR_RGB),
+        [RENDER_SERVER_TEXTURE_FORMAT_RGBA] = TFMV_M(4, GL_RGBA, STBIR_RGBA),
+        [RENDER_SERVER_TEXTURE_FORMAT_BGR] = TFMV_M(3, GL_BGR, STBIR_BGR),
+        [RENDER_SERVER_TEXTURE_FORMAT_BGRA] = TFMV_M(4, GL_BGRA, STBIR_BGRA),
+};
+
+#undef TFMV_M
 
 static const GLenum TEX_FILTER_MAP[RENDER_SERVER_TEXTURE_FILTER_COUNT] = {
         [RENDER_SERVER_TEXTURE_FILTER_NEAREST] = GL_NEAREST,
@@ -217,13 +228,17 @@ static void init_glad_cb(void* args, void* ctx) {
         LOG_FATAL("OpenGL load error (glad)")
     }
     g_gladLoaded = true;
+
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 }
 
 #define INIT_SUBSYSTEM_VARS(var_name, type, chunk_size, chunks_count)                                   \
     chunk_memory_allocator_constructor(&var_name, sizeof(type), chunk_size, chunks_count);
 
-
 static boolean _init(void) {
+    // First we should create a window. With window will be created an OpenGL context.
+    // We don't know when the context will be created (bc it's user's space), this why we use signal
+    // system.
     SignalCallbackHandler h = RenderContext.signal_connect("gl_context_created", init_glad_cb, NULL);
     if (h == 0) {
         LOG_ERROR_OR_DEBUG_FATAL("RenderServer::_init: Signal can't be connected");
@@ -282,6 +297,16 @@ static int task_comp(const void* a, const void* b) {
     return 0;
 }
 
+#ifdef HE_DEBUG
+    #define __CMA_PTR(cma, hdl) chunk_memory_allocator_get_real_ptr(cma, hdl);
+#else
+    #define __CMA_PTR(cma, hdl) chunk_memory_allocator_get_real_ptr_unsafe(cma, hdl);
+#endif
+
+
+static inline void* cma_ptr(ChunkMemoryAllocator* cma, chunk_allocator_ptr hdl) {
+    return hdl == 0 ? NULL : __CMA_PTR(cma, hdl);
+}
 
 static boolean _draw(double delta) {
     if (!g_gladLoaded)
@@ -323,7 +348,7 @@ static boolean _draw(double delta) {
             glScissor(viewport->pos.x, viewport->pos.y, viewport->size.x, viewport->size.y);
 
             glEnableClientState(GL_VERTEX_ARRAY);
-            glEnableClientState(GL_COLOR_ARRAY);
+            //            glEnableClientState(GL_COLOR_ARRAY);
 
             // render
             glClearColor(1.0f, 0.0f, 0.0, 0.0f);
@@ -341,20 +366,45 @@ static boolean _draw(double delta) {
             const usize instances_size = task->world->instances.size;
             usize* const instances = task->world->instances.data;
             for (usize i = 0; i < instances_size; ++i) {
-                struct Instance* const instance = CMA_PTR(&g_instances, instances[i]);
+                struct Instance* const instance = cma_ptr(&g_instances, instances[i]);
 
-                struct Mesh* const mesh = CMA_PTR(&g_meshes, instance->mesh);
-                struct Buffer* const vbo = CMA_PTR(&g_buffers, mesh->vertices_buf);
-                struct Buffer* const ebo = CMA_PTR(&g_buffers, mesh->indices_buf);
+
+                struct Material* const material = cma_ptr(&g_materials, instance->material);
+                struct Mesh* const mesh = cma_ptr(&g_meshes, instance->mesh);
+                struct Buffer* const vbo = cma_ptr(&g_buffers, mesh->vertices_buf);
+                struct Buffer* const ebo = cma_ptr(&g_buffers, mesh->indices_buf);
+                struct Buffer* const ubo = cma_ptr(&g_buffers, mesh->uv1_buf);
+
 
                 glPushMatrix();
 
                 glMultMatrixf((GLfloat*) &instance->transform.m);
+
+                if (ubo && material && material->albedo_texture) {
+                    struct Texture* const texture = cma_ptr(&g_textures, material->albedo_texture);
+
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, texture->gl_tex_hdl);
+
+                    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+                    glClientActiveTexture(GL_TEXTURE0);
+                    glTexCoordPointer(2, GL_FLOAT, 0, ubo->ptr);
+                }
+
+
                 // glMultMatrixf(t);
 
-                glColorPointer(3, GL_FLOAT, 0, vbo->ptr);
+                //                glColorPointer(3, GL_FLOAT, 0, vbo->ptr);
                 glVertexPointer(3, GL_FLOAT, 0, vbo->ptr);
                 glDrawElements(GL_TRIANGLES, ebo->size / 4, GL_UNSIGNED_INT, ebo->ptr);
+
+                if (ubo && material && material->albedo_texture) {
+                    glActiveTexture(GL_TEXTURE0);
+                    glClientActiveTexture(GL_TEXTURE0);
+                    glEnable(GL_TEXTURE_2D);
+                    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+                }
+
 
                 glPopMatrix();
             }
@@ -801,7 +851,21 @@ static boolean texture_set_data(
 ) {
     ERROR_ARGS_CHECK_3(hdl, data, dimensions, { return false; });
     ERROR_ARGS_CHECK_2(dimensions->x, dimensions->y, { return false; });
-    ERROR_RANGE_CHECK(format, 0, RENDER_SERVER_TEXTURE_FORMAT_COUNT, { return false; });
+    //    ERROR_RANGE_CHECK(format, 0, RENDER_SERVER_TEXTURE_FORMAT_COUNT, { return false; });
+    if (!(data_type == RENDER_SERVER_DATA_TYPE_U8 || data_type == RENDER_SERVER_DATA_TYPE_F32)) {
+        LOG_ERROR_OR_DEBUG_FATAL(
+                LOG_HEADER "Texture format must be only u8 of f32 (RENDER_SERVER_DATA_TYPE_U8 or "
+                           "RENDER_SERVER_DATA_TYPE_F32)"
+        );
+        set_error(ERROR_INVALID_ARGUMENT);
+        return false;
+    }
+
+    if (dimensions->x % 2 != 0 || dimensions->y % 2 != 0) {
+        LOG_ERROR_OR_DEBUG_FATAL(LOG_HEADER "Texture must be power of two (16x16, 256x256, etc.)")
+        set_error(ERROR_INVALID_ARGUMENT);
+        return false;
+    }
 
     CMA_CHECK_LOAD(Texture, g_textures, { return false; });
 
@@ -910,15 +974,72 @@ static boolean texture_update(RenderServerTextureHandle hdl) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, TEX_WRAP_MODE_MAP[ptr->wrap_t]);
 
     // Format
-    GLenum format = TEX_FORMAT_MAP[ptr->format];
+    GLenum format = TEX_FORMAT_MAP[ptr->format].gl_value;
     GLenum data_type = DATA_TYPE_MAP[ptr->data_type];
     glTexImage2D(
             GL_TEXTURE_2D, 0, format, ptr->dimensions.x, ptr->dimensions.y, 0, format, data_type,
             ptr->data_ptr
     );
 
-    if (ptr->mipmap_is_enabled) {
-        // Gen mipmap via glu or extern library
+    // STB Image Resize MipMap generation
+    u8 format_size = TEX_FORMAT_MAP[ptr->format].size;
+    stbir_pixel_layout stbir_format = TEX_FORMAT_MAP[ptr->format].stbir_format;
+    if (ptr->mipmap_is_enabled && false) {
+        usize data_type_size =
+                data_type == RENDER_SERVER_DATA_TYPE_F32 ? sizeof(f32) : sizeof(u8); // f32 or u8
+
+        const usize data_size = data_type_size * format_size * ptr->dimensions.x * ptr->dimensions.y;
+
+        // Temp texture X/2 x Y/2 for the largest level of MipMap
+        void* tmp_buffer_1 = tmalloc(data_size / 4);
+        ERROR_ALLOC_CHECK(tmp_buffer_1, { return false; });
+
+        // Temp texture X/4 x Y/4 for the next level of the largest level of MipMap
+        void* tmp_buffer_2 = tmalloc(data_size / 8);
+        ERROR_ALLOC_CHECK(tmp_buffer_2, { return false; });
+
+        const u8* input_ptr = ptr->data_ptr;
+        u8* output_ptr = tmp_buffer_1;
+
+        i32 input_w = ptr->dimensions.x;
+        i32 input_h = ptr->dimensions.y;
+
+        u32 level = 1;
+        while (input_w > 1 && input_h > 1) {
+            i32 output_w = input_w / 2;
+            i32 output_h = input_h / 2;
+
+            if (data_type == RENDER_SERVER_DATA_TYPE_F32) {
+                stbir_resize_float_linear(
+                        (const float*) input_ptr, input_w, input_h, 0, (float*) output_ptr, output_w,
+                        output_h, 0, stbir_format
+                );
+            } else {
+                stbir_resize_uint8_srgb(
+                        input_ptr, input_w, input_h, 0, output_ptr, output_w, output_h, 0, stbir_format
+                );
+            }
+
+            glTexImage2D(
+                    GL_TEXTURE_2D, level, format, output_w, output_h, 0, format, data_type, output_ptr
+            );
+
+            // Swap buffers
+            if (level % 2 == 0) { // 2, 4, 6, ... iters
+                input_ptr = tmp_buffer_1;
+                output_ptr = tmp_buffer_2;
+            } else { // 1, 3, 5, ... iters
+                input_ptr = tmp_buffer_2;
+                output_ptr = tmp_buffer_1;
+            }
+
+            ++level;
+            input_w = output_w;
+            input_h = output_h;
+        }
+
+        tfree(tmp_buffer_1);
+        tfree(tmp_buffer_2);
     }
 
     glBindTexture(GL_TEXTURE_2D, 0);
@@ -928,10 +1049,14 @@ static boolean texture_update(RenderServerTextureHandle hdl) {
 #undef METHOD_NAME
 
 
+#define METHOD_NAME "texture_destroy"
 static boolean texture_destroy(RenderServerTextureHandle hdl) {
     ERROR_ARGS_CHECK_1(hdl, { return false; });
+    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
+    glDeleteTextures(1, &ptr->gl_tex_hdl);
     return chunk_memory_allocator_free_mem(&g_textures, hdl);
 }
+#undef METHOD_NAME
 
 #define REGISTER(fn) render_server_backend_set_function(backend, #fn, (void (*)(void)) fn)
 
@@ -991,6 +1116,7 @@ void render_server_opengl_13_backend_register(void) {
     REGISTER(texture_set_mipmap);
     REGISTER(texture_set_wrap);
     REGISTER(texture_update);
+    REGISTER(texture_destroy);
 
     render_server_register_backend("OpenGL 1.3", backend);
 }
