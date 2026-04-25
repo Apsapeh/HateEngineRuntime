@@ -19,7 +19,7 @@ struct AllocationData {
     i32 user_line;
 };
     #elif defined(HE_MEM_TRACK)
-struct allocationData {
+struct AllocationData {
     void* ptr;
     usize size;
     c_str user_func;

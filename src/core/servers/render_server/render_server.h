@@ -376,22 +376,22 @@ typedef struct RenderServerWorld RenderServerWorld;
 /**
  * @api
  */
-typedef chunk_allocator_ptr RenderServerInstanceHandle;
+typedef struct RenderServerInstance RenderServerInstance;
 
 /**
  * @api
  */
-typedef chunk_allocator_ptr RenderServerMeshHandle;
+typedef struct RenderServerMesh RenderServerMesh;
 
 /**
  * @api
  */
-typedef chunk_allocator_ptr RenderServerBufferHandle;
+typedef struct RenderServerBuffer RenderServerBuffer;
 
 /**
  * @api
  */
-typedef chunk_allocator_ptr RenderServerMaterialHandle;
+typedef struct RenderServerMaterial RenderServerMaterial;
 
 
 /**
@@ -401,7 +401,7 @@ typedef chunk_allocator_ptr RenderServerMaterialHandle;
  *
  * @api
  */
-typedef chunk_allocator_ptr RenderServerTextureHandle;
+typedef struct RenderServerTexture RenderServerTexture;
 
 /**
  * @api server
@@ -449,66 +449,62 @@ typedef struct {
 
     // World (contains all data to draw)
     RenderServerWorld* (*world_create)(void);
-    boolean (*world_add_instance)(RenderServerWorld* world, RenderServerInstanceHandle instance);
-    boolean (*world_del_instance)(RenderServerWorld* world, RenderServerInstanceHandle instance);
+    boolean (*world_add_instance)(RenderServerWorld* world, RenderServerInstance* instance);
+    boolean (*world_del_instance)(RenderServerWorld* world, RenderServerInstance* instance);
     boolean (*world_set_ambient_color)(RenderServerWorld* world, const Vec4* const color);
     boolean (*world_destroy)(RenderServerWorld* world);
 
     // Instance (contains mesh, material, transform)
-    RenderServerInstanceHandle (*instance_create)(void);
-    boolean (*instance_set_mesh)(RenderServerInstanceHandle instance, RenderServerMeshHandle mesh);
-    boolean (*instance_set_material)(
-            RenderServerInstanceHandle instance, RenderServerMaterialHandle material
-    );
-    boolean (*instance_set_transform)(RenderServerInstanceHandle instance, const Mat4* const trasform);
-    boolean (*instance_destroy)(RenderServerInstanceHandle instance);
+    RenderServerInstance* (*instance_create)(void);
+    boolean (*instance_set_mesh)(RenderServerInstance* instance, RenderServerMesh* mesh);
+    boolean (*instance_set_material)(RenderServerInstance* instance, RenderServerMaterial* material);
+    boolean (*instance_set_transform)(RenderServerInstance* instance, const Mat4* const trasform);
+    boolean (*instance_destroy)(RenderServerInstance* instance);
 
     // Mesh
-    RenderServerMeshHandle (*mesh_create)(void);
+    RenderServerMesh* (*mesh_create)(void);
     boolean (*mesh_set_buffer)(
-            RenderServerMeshHandle hdl, RenderServerBufferType target, RenderServerBufferHandle buffer
+            RenderServerMesh* self, RenderServerBufferType target, RenderServerBuffer* buffer
     );
-    boolean (*mesh_destroy)(RenderServerMeshHandle hdl);
+    boolean (*mesh_destroy)(RenderServerMesh* self);
 
     // Buffer
-    RenderServerBufferHandle (*buffer_create)(
+    RenderServerBuffer* (*buffer_create)(
             RenderServerBufferType type, RenderServerBufferUsageHint usage_hint
     );
     boolean (*buffer_set_data)(
-            RenderServerBufferHandle hdl, const void* data, u64 data_size_in_bytes,
+            RenderServerBuffer* hdl, const void* data, u64 data_size_in_bytes,
             RenderServerDataType data_type, RenderServerDataOwnMode data_own_mode
     );
-    boolean (*buffer_destroy)(RenderServerBufferHandle hdl);
+    boolean (*buffer_destroy)(RenderServerBuffer* hdl);
 
     // Material
-    RenderServerMaterialHandle (*material_create)(void);
-    boolean (*material_set_albedo_texture)(
-            RenderServerMaterialHandle material, RenderServerTextureHandle texture
-    );
-    boolean (*material_destroy)(RenderServerMaterialHandle hdl);
+    RenderServerMaterial* (*material_create)(void);
+    boolean (*material_set_albedo_texture)(RenderServerMaterial* material, RenderServerTexture* texture);
+    boolean (*material_destroy)(RenderServerMaterial* hdl);
 
     // Texture
-    RenderServerTextureHandle (*texture_create)(void);
+    RenderServerTexture* (*texture_create)(void);
     /**
      * @param data_type Must be only u8 or f32 (RENDER_SERVER_DATA_TYPE_U8 or
      * RENDER_SERVER_DATA_TYPE_F32)
      * @param data Pointer must be valid until texture_update is called
      */
     boolean (*texture_set_data)(
-            RenderServerTextureHandle hdl, RenderServerTextureFormat format,
-            const IVec2* const dimensions, RenderServerDataType data_type, const u8* const data
+            RenderServerTexture* hdl, RenderServerTextureFormat format, const IVec2* const dimensions,
+            RenderServerDataType data_type, const u8* const data
     );
     boolean (*texture_set_filter)(
-            RenderServerTextureHandle hdl, RenderServerTextureFilter min, RenderServerTextureFilter mag
+            RenderServerTexture* hdl, RenderServerTextureFilter min, RenderServerTextureFilter mag
     );
     boolean (*texture_set_mipmap)(
-            RenderServerTextureHandle hdl, boolean enable, RenderServerTextureMipmapFilter min
+            RenderServerTexture* hdl, boolean enable, RenderServerTextureMipmapFilter min
     );
     boolean (*texture_set_wrap)(
-            RenderServerTextureHandle hdl, RenderServerTextureWrapMode s, RenderServerTextureWrapMode t
+            RenderServerTexture* hdl, RenderServerTextureWrapMode s, RenderServerTextureWrapMode t
     );
-    boolean (*texture_update)(RenderServerTextureHandle hdl);
-    boolean (*texture_destroy)(RenderServerTextureHandle hdl);
+    boolean (*texture_update)(RenderServerTexture* hdl);
+    boolean (*texture_destroy)(RenderServerTexture* hdl);
 
 } RenderServerBackend;
 

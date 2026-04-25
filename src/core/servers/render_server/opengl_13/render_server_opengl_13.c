@@ -3,6 +3,7 @@
 #include <core/math/ivec2.h>
 
 #include <core/platform/memory.h>
+#include <core/mm/pool_allocator.h>
 #include <core/servers/render_server/render_server.h>
 #include <core/error.h>
 #include <core/log.h>
@@ -13,8 +14,6 @@
 #include <string.h>
 
 #include <core/servers/render_server/methods-signatures.h.gen>
-#include "error.h"
-
 
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_STATIC
@@ -27,20 +26,15 @@
 #define ANY_ERROR "OpenGLAnyError"
 /* ================== */
 
-#define INSTANCES_CHUNK_SIZE 128
-#define INSTANCES_CHUNKS_COUNT 4
+#define INSTANCES_CHUNK_SIZE 512
 
-#define MESHES_CHUNK_SIZE 128
-#define MESHES_CHUNKS_COUNT 4
+#define MESHES_CHUNK_SIZE 512
 
-#define BUFFERS_CHUNK_SIZE 512
-#define BUFFERS_CHUNKS_COUNT 4
+#define BUFFERS_CHUNK_SIZE 2048
 
-#define MATERIALS_CHUNK_SIZE 128
-#define MATERIALS_CHUNKS_COUNT 4
+#define MATERIALS_CHUNK_SIZE 256
 
-#define TEXTURES_CHUNK_SIZE 128
-#define TEXTURES_CHUNKS_COUNT 4
+#define TEXTURES_CHUNK_SIZE 256
 
 
 /* ================================ Render Task ============================== */
@@ -79,31 +73,27 @@ struct RenderServerCamera {
 
 
 /* ==================================  World ================================= */
-
-vector_template_def_static(instanceHandle, usize); // RenderServerInstanceHandle
-vector_template_impl_static(instanceHandle, usize); //   RenderServerInstanceHandle
-
 struct RenderServerWorld {
-    vec_instanceHandle instances; // TODO: change to hash map
+    vec_ptr instances; // TODO: change to hash set
 };
 
 
 /* ============================== Inner Structs ============================== */
-struct Instance {
-    usize mesh; // RenderServerMeshHandle
-    usize material; // RenderServerMaterialHandle
+struct RenderServerInstance {
+    RenderServerMesh* mesh; // RenderServerMeshHandle
+    RenderServerMaterial* material; // RenderServerMaterialHandle
     Mat4 transform;
 };
 
-struct Mesh {
-    usize vertices_buf; // RenderServerBufferHandle
-    usize indices_buf; // RenderServerBufferHandle
-    usize normals_buf; // RenderServerBufferHandle
-    usize uv1_buf; // RenderServerBufferHandle
-    usize uv2_buf; // RenderServerBufferHandle
+struct RenderServerMesh {
+    RenderServerBuffer* vertices_buf; // RenderServerBufferHandle
+    RenderServerBuffer* indices_buf; // RenderServerBufferHandle
+    RenderServerBuffer* normals_buf; // RenderServerBufferHandle
+    RenderServerBuffer* uv1_buf; // RenderServerBufferHandle
+    RenderServerBuffer* uv2_buf; // RenderServerBufferHandle
 };
 
-struct Buffer {
+struct RenderServerBuffer {
     RenderServerBufferType buffer_type; // Vertex, Index, Normal, etc.
     RenderServerDataType data_type; // Float, Int, etc.
     RenderServerDataOwnMode own_mode; // Copy, Borrow, Ptr
@@ -111,11 +101,11 @@ struct Buffer {
     usize size;
 };
 
-struct Material {
-    usize albedo_texture; // RenderServerTextureHandle
+struct RenderServerMaterial {
+    RenderServerTexture* albedo_texture; // RenderServerTextureHandle
 };
 
-struct Texture {
+struct RenderServerTexture {
     boolean mipmap_is_enabled;
     RenderServerDataType data_type;
     RenderServerTextureFormat format;
@@ -136,19 +126,19 @@ struct Texture {
 static boolean g_gladLoaded = false;
 
 /***** Instances *****/
-static ChunkMemoryAllocator g_instances;
+static PoolAllocator g_instances;
 
 /***** Mesh *****/
-static ChunkMemoryAllocator g_meshes;
+static PoolAllocator g_meshes;
 
 /***** Buffer *****/
-static ChunkMemoryAllocator g_buffers;
+static PoolAllocator g_buffers;
 
 /***** Material *****/
-static ChunkMemoryAllocator g_materials;
+static PoolAllocator g_materials;
 
 /***** Texture *****/
-static ChunkMemoryAllocator g_textures;
+static PoolAllocator g_textures;
 
 
 /* ============================================================================ */
@@ -232,8 +222,6 @@ static void init_glad_cb(void* args, void* ctx) {
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 }
 
-#define INIT_SUBSYSTEM_VARS(var_name, type, chunk_size, chunks_count)                                   \
-    chunk_memory_allocator_constructor(&var_name, sizeof(type), chunk_size, chunks_count);
 
 static boolean _init(void) {
     // First we should create a window. With window will be created an OpenGL context.
@@ -247,11 +235,12 @@ static boolean _init(void) {
 
     g_renderTaskPtrs = vec_ptr_init();
 
-    INIT_SUBSYSTEM_VARS(g_instances, struct Instance, INSTANCES_CHUNK_SIZE, INSTANCES_CHUNKS_COUNT);
-    INIT_SUBSYSTEM_VARS(g_meshes, struct Mesh, MESHES_CHUNK_SIZE, MESHES_CHUNKS_COUNT);
-    INIT_SUBSYSTEM_VARS(g_buffers, struct Buffer, BUFFERS_CHUNK_SIZE, BUFFERS_CHUNKS_COUNT);
-    INIT_SUBSYSTEM_VARS(g_materials, struct Material, MATERIALS_CHUNK_SIZE, MATERIALS_CHUNKS_COUNT);
-    INIT_SUBSYSTEM_VARS(g_textures, struct Texture, TEXTURES_CHUNK_SIZE, TEXTURES_CHUNKS_COUNT);
+    //    INIT_SUBSYSTEM_VARS(g_instances, struct Instance, INSTANCES_CHUNK_SIZE);
+    pool_allocator_constructor(&g_instances, sizeof(RenderServerInstance), INSTANCES_CHUNK_SIZE);
+    pool_allocator_constructor(&g_meshes, sizeof(RenderServerMesh), MESHES_CHUNK_SIZE);
+    pool_allocator_constructor(&g_buffers, sizeof(RenderServerBuffer), BUFFERS_CHUNK_SIZE);
+    pool_allocator_constructor(&g_materials, sizeof(RenderServerMaterial), MATERIALS_CHUNK_SIZE);
+    pool_allocator_constructor(&g_textures, sizeof(RenderServerTexture), TEXTURES_CHUNK_SIZE);
 
     return true;
 }
@@ -261,11 +250,11 @@ static boolean _init(void) {
 static boolean _quit(void) {
     vec_ptr_free(&g_renderTaskPtrs);
 
-    QUIT_SUBSYSTEM_VARS(g_instances);
-    QUIT_SUBSYSTEM_VARS(g_meshes);
-    QUIT_SUBSYSTEM_VARS(g_buffers);
-    QUIT_SUBSYSTEM_VARS(g_materials);
-    QUIT_SUBSYSTEM_VARS(g_textures);
+    pool_allocator_destructor(&g_instances);
+    pool_allocator_destructor(&g_meshes);
+    pool_allocator_destructor(&g_buffers);
+    pool_allocator_destructor(&g_materials);
+    pool_allocator_destructor(&g_textures);
 
     return true;
 }
@@ -295,17 +284,6 @@ static int task_comp(const void* a, const void* b) {
     if (arg1 > arg2)
         return 1;
     return 0;
-}
-
-#ifdef HE_DEBUG
-    #define __CMA_PTR(cma, hdl) chunk_memory_allocator_get_real_ptr(cma, hdl);
-#else
-    #define __CMA_PTR(cma, hdl) chunk_memory_allocator_get_real_ptr_unsafe(cma, hdl);
-#endif
-
-
-static inline void* cma_ptr(ChunkMemoryAllocator* cma, chunk_allocator_ptr hdl) {
-    return hdl == 0 ? NULL : __CMA_PTR(cma, hdl);
 }
 
 static boolean _draw(double delta) {
@@ -364,24 +342,23 @@ static boolean _draw(double delta) {
             glMatrixMode(GL_MODELVIEW);
             glLoadMatrixf((GLfloat*) &camera->view);
             const usize instances_size = task->world->instances.size;
-            usize* const instances = task->world->instances.data;
+            const RenderServerInstance** const instances =
+                    (const RenderServerInstance**) task->world->instances.data;
             for (usize i = 0; i < instances_size; ++i) {
-                struct Instance* const instance = cma_ptr(&g_instances, instances[i]);
+                const RenderServerInstance* const instance = instances[i];
 
-
-                struct Material* const material = cma_ptr(&g_materials, instance->material);
-                struct Mesh* const mesh = cma_ptr(&g_meshes, instance->mesh);
-                struct Buffer* const vbo = cma_ptr(&g_buffers, mesh->vertices_buf);
-                struct Buffer* const ebo = cma_ptr(&g_buffers, mesh->indices_buf);
-                struct Buffer* const ubo = cma_ptr(&g_buffers, mesh->uv1_buf);
-
+                const RenderServerMaterial* const material = instance->material;
+                const RenderServerMesh* const mesh = instance->mesh;
+                const RenderServerBuffer* const vbo = mesh->vertices_buf;
+                const RenderServerBuffer* const ebo = mesh->indices_buf;
+                const RenderServerBuffer* const ubo = mesh->uv1_buf;
 
                 glPushMatrix();
 
                 glMultMatrixf((GLfloat*) &instance->transform.m);
 
                 if (ubo && material && material->albedo_texture) {
-                    struct Texture* const texture = cma_ptr(&g_textures, material->albedo_texture);
+                    const RenderServerTexture* const texture = material->albedo_texture;
 
                     glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D, texture->gl_tex_hdl);
@@ -563,194 +540,163 @@ static boolean camera_destroy(RenderServerCamera* camera) {
 static RenderServerWorld* world_create(void) {
     RenderServerWorld* world = tmalloc(sizeof(RenderServerWorld));
     ERROR_ALLOC_CHECK(world, { return false; });
-    world->instances = vec_instanceHandle_init();
+    world->instances = vec_ptr_init();
     return world;
 }
 
-static boolean world_add_instance(RenderServerWorld* world, RenderServerInstanceHandle instance) {
+static boolean world_add_instance(RenderServerWorld* world, RenderServerInstance* instance) {
     ERROR_ARGS_CHECK_2(world, instance, { return false; });
-    vec_instanceHandle_push_back(&world->instances, instance);
+    vec_ptr_push_back(&world->instances, instance);
     return true;
 }
 
-static boolean world_del_instance(RenderServerWorld* world, RenderServerInstanceHandle instance) {
+static boolean world_del_instance(RenderServerWorld* world, RenderServerInstance* instance) {
+    // TODO: impl
     return false;
 }
 
 static boolean world_set_ambient_color(RenderServerWorld* world, const Vec4* const color) {
+    // TODO: impl
     return false;
 }
 
 static boolean world_destroy(RenderServerWorld* world) {
     ERROR_ARGS_CHECK_1(world, { return false; });
-    vec_instanceHandle_free(&world->instances);
+    vec_ptr_free(&world->instances);
     tfree(world);
     return false;
 }
 
 
-static RenderServerInstanceHandle instance_create(void) {
-    struct Instance* ptr = NULL;
-    RenderServerInstanceHandle h = chunk_memory_allocator_alloc_mem(&g_instances, (void**) &ptr);
-    ERROR_ALLOC_CHECK(h, { return 0; });
+static RenderServerInstance* instance_create(void) {
+    RenderServerInstance* self = pool_allocator_alloc(&g_instances);
+    ERROR_ALLOC_CHECK(self, { return 0; });
 
-    ptr->material = 0;
-    ptr->mesh = 0;
-    ptr->transform = MAT4_ONE_M;
-    return h;
+    self->material = 0;
+    self->mesh = 0;
+    self->transform = MAT4_ONE_M;
+    return self;
 }
 
-#define INSTANCE_GET_PTR(fn_name)                                                                       \
-    struct Instance* ptr = chunk_memory_allocator_get_real_ptr(&g_instances, instance);                 \
-    if (!ptr) {                                                                                         \
-        LOG_ERROR_OR_DEBUG_FATAL(                                                                       \
-                "RenderServer(OpenGL 1.3)::" fn_name ": Instance with this handle (%u) not found",      \
-                instance                                                                                \
-        );                                                                                              \
-        set_error(ERROR_NOT_FOUND);                                                                     \
-        return false;                                                                                   \
-    }
 
-static boolean instance_set_mesh(RenderServerInstanceHandle instance, RenderServerMeshHandle mesh) {
-    ERROR_ARGS_CHECK_2(instance, mesh, { return false; });
-
-    INSTANCE_GET_PTR("instance_set_mesh")
-    ptr->mesh = mesh;
-
+static boolean instance_set_mesh(RenderServerInstance* self, RenderServerMesh* mesh) {
+    ERROR_ARGS_CHECK_2(self, mesh, { return false; });
+    self->mesh = mesh;
     return true;
 }
 
-static boolean instance_set_material(
-        RenderServerInstanceHandle instance, RenderServerMaterialHandle material
-) {
-    ERROR_ARGS_CHECK_2(instance, material, { return false; });
-
-    INSTANCE_GET_PTR("instance_set_material")
-    ptr->material = material;
-
+static boolean instance_set_material(RenderServerInstance* self, RenderServerMaterial* material) {
+    ERROR_ARGS_CHECK_2(self, material, { return false; });
+    self->material = material;
     return true;
 }
 
-static boolean instance_set_transform(RenderServerInstanceHandle instance, const Mat4* const transform) {
-    ERROR_ARGS_CHECK_1(instance, { return false; });
-
-    INSTANCE_GET_PTR("instance_set_mesh")
-    ptr->transform = *transform;
-
+static boolean instance_set_transform(RenderServerInstance* self, const Mat4* const transform) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    self->transform = *transform;
     return true;
 }
 
-static boolean instance_destroy(RenderServerInstanceHandle instance) {
-    ERROR_ARGS_CHECK_1(instance, { return false; });
-    return chunk_memory_allocator_free_mem(&g_instances, instance);
+static boolean instance_destroy(RenderServerInstance* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    return pool_allocator_dealloc(&g_instances, self);
 }
 
 
 //
-static RenderServerMeshHandle mesh_create(void) {
-    struct Mesh* ptr = NULL;
-    RenderServerMeshHandle h = chunk_memory_allocator_alloc_mem(&g_meshes, (void**) &ptr);
-    ERROR_ALLOC_CHECK(h, { return 0; });
+static RenderServerMesh* mesh_create(void) {
+    RenderServerMesh* self = pool_allocator_alloc(&g_meshes);
+    ERROR_ALLOC_CHECK(self, { return 0; });
 
-    ptr->indices_buf = 0;
-    ptr->vertices_buf = 0;
-    ptr->normals_buf = 0;
-    ptr->uv1_buf = 0;
-    ptr->uv2_buf = 0;
+    self->indices_buf = 0;
+    self->vertices_buf = 0;
+    self->normals_buf = 0;
+    self->uv1_buf = 0;
+    self->uv2_buf = 0;
 
-    return h;
+    return self;
 }
 
 static boolean mesh_set_buffer(
-        RenderServerMeshHandle hdl, RenderServerBufferType target, RenderServerBufferHandle buffer
+        RenderServerMesh* self, RenderServerBufferType target, RenderServerBuffer* buffer
 ) {
-    ERROR_ARGS_CHECK_1(hdl, { return false; });
+    ERROR_ARGS_CHECK_1(self, { return false; });
     ERROR_RANGE_CHECK(target, 0, RENDER_SERVER_BUFFER_TYPE_COUNT, { return false; });
-
-    struct Mesh* ptr = chunk_memory_allocator_get_real_ptr(&g_meshes, hdl);
-    if (!ptr)
-        return false;
 
     switch (target) {
         case RENDER_SERVER_BUFFER_TYPE_VERTEX:
-            ptr->vertices_buf = buffer;
+            self->vertices_buf = buffer;
             break;
         case RENDER_SERVER_BUFFER_TYPE_INDEX:
-            ptr->indices_buf = buffer;
+            self->indices_buf = buffer;
             break;
         case RENDER_SERVER_BUFFER_TYPE_NORMAL:
-            ptr->normals_buf = buffer;
+            self->normals_buf = buffer;
             break;
         case RENDER_SERVER_BUFFER_TYPE_UV1:
-            ptr->uv1_buf = buffer;
+            self->uv1_buf = buffer;
             break;
         case RENDER_SERVER_BUFFER_TYPE_UV2:
-            ptr->uv2_buf = buffer;
+            self->uv2_buf = buffer;
             break;
     }
 
     return true;
 }
 
-static boolean mesh_destroy(RenderServerMeshHandle hdl) {
-    ERROR_ARGS_CHECK_1(hdl, { return false; });
-    return chunk_memory_allocator_free_mem(&g_meshes, hdl);
+static boolean mesh_destroy(RenderServerMesh* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    return pool_allocator_dealloc(&g_meshes, self);
 }
 
 
 #define METHOD_NAME "buffer_create"
-static RenderServerBufferHandle buffer_create(
+static RenderServerBuffer* buffer_create(
         RenderServerBufferType type, RenderServerBufferUsageHint usage_hint
 ) {
     ERROR_RANGE_CHECK(usage_hint, 0, RENDER_SERVER_BUFFER_USAGE_HINT_COUNT, { return 0; });
     ERROR_RANGE_CHECK(type, 0, RENDER_SERVER_BUFFER_TYPE_COUNT, { return 0; });
 
-    struct Buffer* ptr = NULL;
-    RenderServerBufferHandle h = chunk_memory_allocator_alloc_mem(&g_buffers, (void**) &ptr);
-    ERROR_ALLOC_CHECK(h, { return 0; });
+    RenderServerBuffer* self = pool_allocator_alloc(&g_buffers);
+    ERROR_ALLOC_CHECK(self, { return NULL; });
 
-    ptr->ptr = NULL;
-    ptr->size = 0;
-    ptr->own_mode = RENDER_SERVER_DATA_OWN_MODE_PTR;
-    ptr->buffer_type = type;
+    self->ptr = NULL;
+    self->size = 0;
+    self->own_mode = RENDER_SERVER_DATA_OWN_MODE_PTR;
+    self->buffer_type = type;
 
-    return h;
+    return self;
 }
 #undef METHOD_NAME
 
 #define METHOD_NAME "buffer_set_data"
 static boolean buffer_set_data(
-        RenderServerBufferHandle hdl, const void* data, u64 data_size, RenderServerDataType data_type,
+        RenderServerBuffer* self, const void* data, u64 data_size, RenderServerDataType data_type,
         RenderServerDataOwnMode data_own_mode
 ) {
-    ERROR_ARGS_CHECK_3(hdl, data, data_size, { return false; });
+    ERROR_ARGS_CHECK_3(self, data, data_size, { return false; });
     ERROR_RANGE_CHECK(data_type, 0, RENDER_SERVER_DATA_TYPE_COUNT, { return false; })
     ERROR_RANGE_CHECK(data_own_mode, 0, RENDER_SERVER_DATA_OWN_MODE_COUNT, { return false; })
 
     // In OpenGL 1.x you don't have any GPU buffers, all data stored in the RAM.
     // You must send all your data to the GPU immediatly at an each frame
-
-    struct Buffer* ptr = chunk_memory_allocator_get_real_ptr(&g_buffers, hdl);
-    if (!ptr)
-        return false;
-
-    void* prev_ptr = ptr->ptr;
+    void* prev_ptr = self->ptr;
 
     if (data_own_mode == RENDER_SERVER_DATA_OWN_MODE_COPY) {
         void* new_data_ptr;
-        if (ptr->own_mode == RENDER_SERVER_DATA_OWN_MODE_PTR)
+        if (self->own_mode == RENDER_SERVER_DATA_OWN_MODE_PTR)
             new_data_ptr = tmalloc(data_size);
         else
-            new_data_ptr = trealloc(ptr->ptr, data_size);
+            new_data_ptr = trealloc(self->ptr, data_size);
         ERROR_ALLOC_CHECK(new_data_ptr, { return false; });
         memcpy(new_data_ptr, data, data_size);
 
-        ptr->ptr = new_data_ptr;
+        self->ptr = new_data_ptr;
     } else if (data_own_mode == RENDER_SERVER_DATA_OWN_MODE_BORROW) {
         // Yes, cast (const void*) to (void*). But this data is borowed
-        ptr->ptr = (void*) data;
+        self->ptr = (void*) data;
     } else if (data_own_mode == RENDER_SERVER_DATA_OWN_MODE_PTR) {
-        ptr->ptr = (void*) data;
+        self->ptr = (void*) data;
     } else {
         LOG_ERROR_OR_DEBUG_FATAL(
                 "RenderServer::buffer_set_data: unknown 'data_own_mode' - '%c'", data_own_mode
@@ -760,96 +706,87 @@ static boolean buffer_set_data(
     }
 
     // If prev data is owned by buffer and now not used
-    if (ptr->own_mode != RENDER_SERVER_DATA_OWN_MODE_PTR &&
+    if (self->own_mode != RENDER_SERVER_DATA_OWN_MODE_PTR &&
         data_own_mode != RENDER_SERVER_DATA_OWN_MODE_COPY) {
         tfree(prev_ptr);
     }
 
-    ptr->data_type = data_type;
-    ptr->own_mode = data_own_mode;
-    ptr->size = data_size;
+    self->data_type = data_type;
+    self->own_mode = data_own_mode;
+    self->size = data_size;
     return true;
 }
 #undef METHOD_NAME
 
-static boolean buffer_destroy(RenderServerBufferHandle hdl) {
-    ERROR_ARGS_CHECK_1(hdl, { return false; });
+static boolean buffer_destroy(RenderServerBuffer* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
 
-    struct Buffer* ptr = chunk_memory_allocator_get_real_ptr(&g_buffers, hdl);
-    if (!ptr)
-        return false;
-
-    if (ptr->own_mode == RENDER_SERVER_DATA_OWN_MODE_COPY ||
-        ptr->own_mode == RENDER_SERVER_DATA_OWN_MODE_BORROW) {
-        tfree(ptr->ptr);
+    if (self->own_mode == RENDER_SERVER_DATA_OWN_MODE_COPY ||
+        self->own_mode == RENDER_SERVER_DATA_OWN_MODE_BORROW) {
+        tfree(self->ptr);
     }
 
-    return chunk_memory_allocator_free_mem(&g_buffers, hdl);
+    return pool_allocator_dealloc(&g_buffers, self);
 }
 
 
-static RenderServerMaterialHandle material_create(void) {
-    struct Material* ptr = NULL;
-    RenderServerMaterialHandle h = chunk_memory_allocator_alloc_mem(&g_materials, (void**) &ptr);
-    ERROR_ALLOC_CHECK(h, { return 0; });
+static RenderServerMaterial* material_create(void) {
+    RenderServerMaterial* self = pool_allocator_alloc(&g_meshes);
+    ERROR_ALLOC_CHECK(self, { return 0; });
 
-    ptr->albedo_texture = 0;
-    return h;
+    self->albedo_texture = 0;
+    return self;
 }
 
 #define METHOD_NAME "material_set_albedo_texture"
-static boolean material_set_albedo_texture(
-        RenderServerMaterialHandle hdl, RenderServerTextureHandle tex
-) {
+static boolean material_set_albedo_texture(RenderServerMaterial* self, RenderServerTexture* tex) {
     // We are checks only hdl, so tex can be nulled
-    ERROR_ARGS_CHECK_1(hdl, { return false; });
-    CMA_CHECK_LOAD(Material, g_materials, { return false; });
+    ERROR_ARGS_CHECK_1(self, { return false; });
 
-    ptr->albedo_texture = tex;
+    self->albedo_texture = tex;
 
     return true;
 }
 #undef METHOD_NAME
 
-static boolean material_destroy(RenderServerMaterialHandle ptr) {
-    ERROR_ARGS_CHECK_1(ptr, { return false; });
-    return chunk_memory_allocator_free_mem(&g_materials, ptr);
+static boolean material_destroy(RenderServerMaterial* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    return pool_allocator_dealloc(&g_materials, self);
 }
 
 #define METHOD_NAME "texture_create"
-static RenderServerTextureHandle texture_create(void) {
-    struct Texture* ptr = NULL;
-    RenderServerMaterialHandle h = chunk_memory_allocator_alloc_mem(&g_textures, (void**) &ptr);
-    ERROR_ALLOC_CHECK(h, { return 0; });
+static RenderServerTexture* texture_create(void) {
+    RenderServerTexture* self = pool_allocator_alloc(&g_textures);
+    ERROR_ALLOC_CHECK(self, { return NULL; });
 
-    glGenTextures(1, &ptr->gl_tex_hdl);
+    glGenTextures(1, &self->gl_tex_hdl);
 
-    if (ptr->gl_tex_hdl == 0) {
+    if (self->gl_tex_hdl == 0) {
         u32 code = glGetError();
         LOG_ERROR_OR_DEBUG_FATAL(LOG_HEADER " glGenTextures is failed with OpenGL error: %u", code);
         set_error(ANY_ERROR);
-        return 0;
+        return NULL;
     }
 
-    ptr->data_ptr = NULL;
-    ptr->filter_min = RENDER_SERVER_TEXTURE_FILTER_LINEAR;
-    ptr->filter_mag = RENDER_SERVER_TEXTURE_FILTER_LINEAR;
-    ptr->mipmap_is_enabled = false;
-    ptr->mipmap_filter_min = RENDER_SERVER_TEXTURE_MIPMAP_FILTER_LINEAR;
-    ptr->wrap_s = RENDER_SERVER_TEXTURE_WRAP_MODE_REPEAT;
-    ptr->wrap_t = RENDER_SERVER_TEXTURE_WRAP_MODE_REPEAT;
+    self->data_ptr = NULL;
+    self->filter_min = RENDER_SERVER_TEXTURE_FILTER_LINEAR;
+    self->filter_mag = RENDER_SERVER_TEXTURE_FILTER_LINEAR;
+    self->mipmap_is_enabled = false;
+    self->mipmap_filter_min = RENDER_SERVER_TEXTURE_MIPMAP_FILTER_LINEAR;
+    self->wrap_s = RENDER_SERVER_TEXTURE_WRAP_MODE_REPEAT;
+    self->wrap_t = RENDER_SERVER_TEXTURE_WRAP_MODE_REPEAT;
 
-    return h;
+    return self;
 }
 #undef METHOD_NAME
 
 
 #define METHOD_NAME "texture_set_data"
 static boolean texture_set_data(
-        RenderServerTextureHandle hdl, RenderServerTextureFormat format, const IVec2* const dimensions,
+        RenderServerTexture* self, RenderServerTextureFormat format, const IVec2* const dimensions,
         RenderServerDataType data_type, const u8* const data
 ) {
-    ERROR_ARGS_CHECK_3(hdl, data, dimensions, { return false; });
+    ERROR_ARGS_CHECK_3(self, data, dimensions, { return false; });
     ERROR_ARGS_CHECK_2(dimensions->x, dimensions->y, { return false; });
     //    ERROR_RANGE_CHECK(format, 0, RENDER_SERVER_TEXTURE_FORMAT_COUNT, { return false; });
     if (!(data_type == RENDER_SERVER_DATA_TYPE_U8 || data_type == RENDER_SERVER_DATA_TYPE_F32)) {
@@ -867,12 +804,10 @@ static boolean texture_set_data(
         return false;
     }
 
-    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
-
-    ptr->data_ptr = data;
-    ptr->data_type = data_type;
-    ptr->dimensions = *dimensions;
-    ptr->format = format;
+    self->data_ptr = data;
+    self->data_type = data_type;
+    self->dimensions = *dimensions;
+    self->format = format;
 
     return true;
 }
@@ -882,16 +817,14 @@ static boolean texture_set_data(
 
 #define METHOD_NAME "texture_set_filter"
 static boolean texture_set_filter(
-        RenderServerTextureHandle hdl, RenderServerTextureFilter min, RenderServerTextureFilter mag
+        RenderServerTexture* self, RenderServerTextureFilter min, RenderServerTextureFilter mag
 ) {
-    ERROR_ARGS_CHECK_1(hdl, { return false; });
+    ERROR_ARGS_CHECK_1(self, { return false; });
     ERROR_RANGE_CHECK(min, 0, RENDER_SERVER_TEXTURE_FILTER_COUNT, { return false; });
     ERROR_RANGE_CHECK(mag, 0, RENDER_SERVER_TEXTURE_FILTER_COUNT, { return false; });
 
-    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
-
-    ptr->filter_min = min;
-    ptr->filter_mag = mag;
+    self->filter_min = min;
+    self->filter_mag = mag;
 
     return true;
 }
@@ -899,24 +832,22 @@ static boolean texture_set_filter(
 
 #define METHOD_NAME "texture_set_mipmap"
 static boolean texture_set_mipmap(
-        RenderServerTextureHandle hdl, boolean enable, RenderServerTextureMipmapFilter min
+        RenderServerTexture* self, boolean enable, RenderServerTextureMipmapFilter min
 ) {
-    ERROR_ARGS_CHECK_1(hdl, { return false; });
+    ERROR_ARGS_CHECK_1(self, { return false; });
     ERROR_RANGE_CHECK(min, 0, RENDER_SERVER_TEXTURE_MIPMAP_FILTER_COUNT, { return false; });
 
-    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
-
-    ptr->mipmap_is_enabled = enable;
-    ptr->mipmap_filter_min = min;
+    self->mipmap_is_enabled = enable;
+    self->mipmap_filter_min = min;
     return true;
 }
 #undef METHOD_NAME
 
 #define METHOD_NAME "texture_set_wrap"
 static boolean texture_set_wrap(
-        RenderServerTextureHandle hdl, RenderServerTextureWrapMode s, RenderServerTextureWrapMode t
+        RenderServerTexture* self, RenderServerTextureWrapMode s, RenderServerTextureWrapMode t
 ) {
-    ERROR_ARGS_CHECK_1(hdl, { return false; });
+    ERROR_ARGS_CHECK_1(self, { return false; });
     ERROR_RANGE_CHECK(s, 0, RENDER_SERVER_TEXTURE_WRAP_MODE_COUNT, { return false; });
     ERROR_RANGE_CHECK(t, 0, RENDER_SERVER_TEXTURE_WRAP_MODE_COUNT, { return false; });
 
@@ -929,10 +860,8 @@ static boolean texture_set_wrap(
         )
     }
 
-    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
-
-    ptr->wrap_s = s;
-    ptr->wrap_t = t;
+    self->wrap_s = s;
+    self->wrap_t = t;
 
     return true;
 }
@@ -940,12 +869,10 @@ static boolean texture_set_wrap(
 
 
 #define METHOD_NAME "texture_update"
-static boolean texture_update(RenderServerTextureHandle hdl) {
-    ERROR_ARGS_CHECK_1(hdl, { return false; });
+static boolean texture_update(RenderServerTexture* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
 
-    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
-
-    if (ptr->data_ptr == NULL) {
+    if (self->data_ptr == NULL) {
         LOG_ERROR_OR_DEBUG_FATAL(
                 LOG_HEADER "Texture pointer is not setted. You must first call \"texture_set_data\"!"
         )
@@ -953,42 +880,42 @@ static boolean texture_update(RenderServerTextureHandle hdl) {
         return false;
     }
 
-    glBindTexture(GL_TEXTURE_2D, ptr->gl_tex_hdl);
+    glBindTexture(GL_TEXTURE_2D, self->gl_tex_hdl);
 
     // Filters
     GLenum min_filter;
     GLenum mag_filter;
 
-    if (ptr->mipmap_is_enabled)
-        min_filter = TEX_MIPMAP_FILTER_MAP[ptr->filter_min][ptr->mipmap_filter_min];
+    if (self->mipmap_is_enabled)
+        min_filter = TEX_MIPMAP_FILTER_MAP[self->filter_min][self->mipmap_filter_min];
     else
-        min_filter = TEX_FILTER_MAP[ptr->filter_min];
+        min_filter = TEX_FILTER_MAP[self->filter_min];
 
-    mag_filter = TEX_FILTER_MAP[ptr->filter_mag];
+    mag_filter = TEX_FILTER_MAP[self->filter_mag];
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter);
 
     // Wrap
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, TEX_WRAP_MODE_MAP[ptr->wrap_s]);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, TEX_WRAP_MODE_MAP[ptr->wrap_t]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, TEX_WRAP_MODE_MAP[self->wrap_s]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, TEX_WRAP_MODE_MAP[self->wrap_t]);
 
     // Format
-    GLenum format = TEX_FORMAT_MAP[ptr->format].gl_value;
-    GLenum data_type = DATA_TYPE_MAP[ptr->data_type];
+    GLenum format = TEX_FORMAT_MAP[self->format].gl_value;
+    GLenum data_type = DATA_TYPE_MAP[self->data_type];
     glTexImage2D(
-            GL_TEXTURE_2D, 0, format, ptr->dimensions.x, ptr->dimensions.y, 0, format, data_type,
-            ptr->data_ptr
+            GL_TEXTURE_2D, 0, format, self->dimensions.x, self->dimensions.y, 0, format, data_type,
+            self->data_ptr
     );
 
     // STB Image Resize MipMap generation
-    u8 format_size = TEX_FORMAT_MAP[ptr->format].size;
-    stbir_pixel_layout stbir_format = TEX_FORMAT_MAP[ptr->format].stbir_format;
-    if (ptr->mipmap_is_enabled && false) {
+    u8 format_size = TEX_FORMAT_MAP[self->format].size;
+    stbir_pixel_layout stbir_format = TEX_FORMAT_MAP[self->format].stbir_format;
+    if (self->mipmap_is_enabled && false) {
         usize data_type_size =
                 data_type == RENDER_SERVER_DATA_TYPE_F32 ? sizeof(f32) : sizeof(u8); // f32 or u8
 
-        const usize data_size = data_type_size * format_size * ptr->dimensions.x * ptr->dimensions.y;
+        const usize data_size = data_type_size * format_size * self->dimensions.x * self->dimensions.y;
 
         // Temp texture X/2 x Y/2 for the largest level of MipMap
         void* tmp_buffer_1 = tmalloc(data_size / 4);
@@ -998,11 +925,11 @@ static boolean texture_update(RenderServerTextureHandle hdl) {
         void* tmp_buffer_2 = tmalloc(data_size / 8);
         ERROR_ALLOC_CHECK(tmp_buffer_2, { return false; });
 
-        const u8* input_ptr = ptr->data_ptr;
+        const u8* input_ptr = self->data_ptr;
         u8* output_ptr = tmp_buffer_1;
 
-        i32 input_w = ptr->dimensions.x;
-        i32 input_h = ptr->dimensions.y;
+        i32 input_w = self->dimensions.x;
+        i32 input_h = self->dimensions.y;
 
         u32 level = 1;
         while (input_w > 1 && input_h > 1) {
@@ -1050,11 +977,10 @@ static boolean texture_update(RenderServerTextureHandle hdl) {
 
 
 #define METHOD_NAME "texture_destroy"
-static boolean texture_destroy(RenderServerTextureHandle hdl) {
-    ERROR_ARGS_CHECK_1(hdl, { return false; });
-    CMA_CHECK_LOAD(Texture, g_textures, { return false; });
-    glDeleteTextures(1, &ptr->gl_tex_hdl);
-    return chunk_memory_allocator_free_mem(&g_textures, hdl);
+static boolean texture_destroy(RenderServerTexture* self) {
+    ERROR_ARGS_CHECK_1(self, { return false; });
+    glDeleteTextures(1, &self->gl_tex_hdl);
+    return pool_allocator_dealloc(&g_textures, self);
 }
 #undef METHOD_NAME
 

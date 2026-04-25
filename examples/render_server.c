@@ -18,7 +18,7 @@ static RenderServerCamera* g_camera;
 Mat4 g_cameraView = MAT4_ONE_M;
 static RenderServerCamera* g_camera2;
 
-static RenderServerInstanceHandle g_instance;
+static RenderServerInstance* g_instance;
 static Mat4 g_transform = MAT4_ONE_M;
 PUBLIC void _ready(void) {
     LOG_INFO("Hello ma boys!");
@@ -42,7 +42,7 @@ PUBLIC void _ready(void) {
     render_server_viewport_set_size(viewport, &viewport_size);
 
     g_camera = render_server_camera_create();
-    mat4_translate_in(&g_cameraView, 0, 0, 200);
+    mat4_translate_in(&g_cameraView, 0, 0, 2);
     render_server_camera_view_set(g_camera, &g_cameraView);
     Mat4 proj_mat;
     float aspect = (float) viewport_size.x / (float) viewport_size.y;
@@ -124,7 +124,7 @@ PUBLIC void _ready(void) {
 
     // clang-format on
 
-    RenderServerBufferHandle vertices_buffer = render_server_buffer_create(
+    RenderServerBuffer* vertices_buffer = render_server_buffer_create(
             RENDER_SERVER_BUFFER_TYPE_VERTEX, RENDER_SERVER_BUFFER_USAGE_HINT_STATIC
     );
     render_server_buffer_set_data(
@@ -132,7 +132,7 @@ PUBLIC void _ready(void) {
             RENDER_SERVER_DATA_OWN_MODE_PTR
     );
 
-    RenderServerBufferHandle indices_buffer = render_server_buffer_create(
+    RenderServerBuffer* indices_buffer = render_server_buffer_create(
             RENDER_SERVER_BUFFER_TYPE_INDEX, RENDER_SERVER_BUFFER_USAGE_HINT_STATIC
     );
     render_server_buffer_set_data(
@@ -140,7 +140,7 @@ PUBLIC void _ready(void) {
             RENDER_SERVER_DATA_OWN_MODE_PTR
     );
 
-    RenderServerBufferHandle uv_buffer = render_server_buffer_create(
+    RenderServerBuffer* uv_buffer = render_server_buffer_create(
             RENDER_SERVER_BUFFER_TYPE_UV1, RENDER_SERVER_BUFFER_USAGE_HINT_STATIC
     );
     render_server_buffer_set_data(
@@ -157,7 +157,7 @@ PUBLIC void _ready(void) {
     };
     // clang-format on
 
-    RenderServerTextureHandle texture = render_server_texture_create();
+    RenderServerTexture* texture = render_server_texture_create();
     ERROR_CATCH(texture);
     IVec2 texture_dimensions = IVEC2_NEW_M(2, 2);
     render_server_texture_set_data(
@@ -169,7 +169,7 @@ PUBLIC void _ready(void) {
     );
     render_server_texture_update(texture);
 
-    RenderServerMaterialHandle material = render_server_material_create();
+    RenderServerMaterial* material = render_server_material_create();
     ERROR_CATCH(material);
 
     //    StringSlice* string = string_slice_from_cstr("albedo_texture", -1);
@@ -177,7 +177,7 @@ PUBLIC void _ready(void) {
     render_server_material_set_albedo_texture(material, texture);
 
 
-    RenderServerMeshHandle mesh = render_server_mesh_create();
+    RenderServerMesh* mesh = render_server_mesh_create();
     render_server_mesh_set_buffer(mesh, RENDER_SERVER_BUFFER_TYPE_VERTEX, vertices_buffer);
     render_server_mesh_set_buffer(mesh, RENDER_SERVER_BUFFER_TYPE_INDEX, indices_buffer);
     render_server_mesh_set_buffer(mesh, RENDER_SERVER_BUFFER_TYPE_UV1, uv_buffer);
